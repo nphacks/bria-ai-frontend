@@ -25,6 +25,21 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
 
   const activeCharacter = characters.find(c => c.id === activeCharacterId);
 
+  // Helper to extract URL regardless of nesting depth
+  const getImageSrc = (img: any): string => {
+    if (!img) return '';
+    if (typeof img === 'string') return img;
+    // Check for nested object structure as requested
+    if (img.image_url && typeof img.image_url === 'object' && img.image_url.image_url) {
+        return img.image_url.image_url;
+    }
+    // Standard structure
+    if (img.image_url && typeof img.image_url === 'string') {
+        return img.image_url;
+    }
+    return '';
+  };
+
   if (!isOpen) return null;
 
   const handleDownloadCharacters = () => {
@@ -181,8 +196,8 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
                          <div className="flex-1 overflow-y-auto custom-scrollbar p-1">
                              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                                  {activeCharacter.generatedPortraits.map((img, idx) => {
-                                     // Robust check: use .image_url if object, or assume string if legacy
-                                     const imgUrl = typeof img === 'string' ? img : img.image_url;
+                                     // Use helper to resolve URL from potential nested objects
+                                     const imgUrl = getImageSrc(img);
                                      const isSelected = selectedReferenceUrls.includes(imgUrl);
                                      
                                      return (
@@ -300,7 +315,7 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
                                         {char.generatedPortraits[0] ? (
                                             <img 
                                                 // Robust check for first image URL
-                                                src={typeof char.generatedPortraits[0] === 'string' ? char.generatedPortraits[0] : char.generatedPortraits[0].image_url} 
+                                                src={getImageSrc(char.generatedPortraits[0])} 
                                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                                             />
                                         ) : (
