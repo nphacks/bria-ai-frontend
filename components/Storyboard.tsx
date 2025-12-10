@@ -1,11 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ScriptElement, CharacterProfile, ArtStyle, GeneratedImage } from '../types';
-import { ArrowLeft, Loader2, Image as ImageIcon, Clapperboard, User, Film, Sparkles, X, Upload, Save, Download, Plus, Users, ChevronRight, ChevronLeft } from 'lucide-react';
+import { ArrowLeft, Loader2, Image as ImageIcon, Clapperboard, User, Film, Sparkles, X, Plus, Users, Save } from 'lucide-react';
 import { generateImage } from '../services/apiService';
 
 interface StoryboardProps {
   sceneElements: ScriptElement[];
   onBack: () => void;
+  savedCharacters: CharacterProfile[];
+  onAddCharacter: (char: CharacterProfile) => void;
+  onOpenCharacterList: () => void;
 }
 
 interface SelectionMenu {
@@ -14,14 +17,13 @@ interface SelectionMenu {
   text: string;
 }
 
-// Local interface for the creation form, distinct from the saved profile
 interface CharacterFormState {
   name: string;
   description: string;
   visualDetails: string;
   artStyle: ArtStyle;
   referenceImages: string[];
-  currentPreview: GeneratedImage | null; // Single image being generated right now
+  currentPreview: GeneratedImage | null;
 }
 
 const ART_STYLES: ArtStyle[] = [
@@ -32,7 +34,13 @@ const ART_STYLES: ArtStyle[] = [
   'Ink Illustration'
 ];
 
-export const Storyboard: React.FC<StoryboardProps> = ({ sceneElements, onBack }) => {
+export const Storyboard: React.FC<StoryboardProps> = ({ 
+  sceneElements, 
+  onBack, 
+  savedCharacters,
+  onAddCharacter,
+  onOpenCharacterList
+}) => {
   // Main Visualization State
   const [generatedScene, setGeneratedScene] = useState<GeneratedImage | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -43,10 +51,8 @@ export const Storyboard: React.FC<StoryboardProps> = ({ sceneElements, onBack })
   const [selectionMenu, setSelectionMenu] = useState<SelectionMenu | null>(null);
   const scriptRef = useRef<HTMLDivElement>(null);
 
-  // Character Management State
-  const [savedCharacters, setSavedCharacters] = useState<CharacterProfile[]>([]);
+  // Character Creation State (Separate from the List Modal)
   const [isCharacterModalOpen, setIsCharacterModalOpen] = useState(false);
-  const [isCharacterListOpen, setIsCharacterListOpen] = useState(false);
   
   // Character Form State
   const [charForm, setCharForm] = useState<CharacterFormState>({
@@ -69,7 +75,6 @@ export const Storyboard: React.FC<StoryboardProps> = ({ sceneElements, onBack })
     return () => document.removeEventListener('click', handleDocumentClick);
   }, [selectionMenu]);
 
-  // Extract the scene heading
   const heading = sceneElements.find(el => el.type === 'SCENE_HEADING')?.content || 'Unknown Scene';
   
   const constructFullScenePrompt = () => {
@@ -122,7 +127,7 @@ export const Storyboard: React.FC<StoryboardProps> = ({ sceneElements, onBack })
   const handleReferenceImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
-      Array.from(files).forEach(file => {
+      Array.from(files).forEach((file: any) => {
         const reader = new FileReader();
         reader.onloadend = () => {
           const base64 = reader.result as string;
@@ -159,76 +164,18 @@ export const Storyboard: React.FC<StoryboardProps> = ({ sceneElements, onBack })
 
   const handleSaveCharacter = () => {
     if (charForm.name && charForm.currentPreview) {
-      setSavedCharacters(prev => {
-        const existingIndex = prev.findIndex(c => c.name.toLowerCase() === charForm.name.toLowerCase());
-        
-        if (existingIndex >= 0) {
-          // Update existing character
-          const updatedCharacters = [...prev];
-          const existingChar = updatedCharacters[existingIndex];
-          
-          updatedCharacters[existingIndex] = {
-            ...existingChar,
-            description: charForm.description,
-            visualDetails: charForm.visualDetails,
-            artStyle: charForm.artStyle,
-            referenceImages: [...new Set([...existingChar.referenceImages, ...charForm.referenceImages])],
-            generatedPortraits: [charForm.currentPreview!, ...existingChar.generatedPortraits]
-          };
-          return updatedCharacters;
-        } else {
-          // Create new character
-          const newChar: CharacterProfile = {
-            id: Date.now().toString(),
-            name: charForm.name,
-            description: charForm.description,
-            visualDetails: charForm.visualDetails,
-            artStyle: charForm.artStyle,
-            referenceImages: charForm.referenceImages,
-            generatedPortraits: [charForm.currentPreview!]
-          };
-          return [...prev, newChar];
-        }
-      });
-      setIsCharacterModalOpen(false);
-    }
-  };
-
-  const handleDownloadCharacters = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(savedCharacters));
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", "characters.json");
-    document.body.appendChild(downloadAnchorNode);
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
-  };
-
-  const handleUploadCharacters = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const loaded = JSON.parse(event.target?.result as string);
-          if (Array.isArray(loaded)) {
-            // Basic validation
-            const valid = loaded.every(c => c.name && Array.isArray(c.generatedPortraits));
-            if (valid) {
-                setSavedCharacters(prev => {
-                    const existingIds = new Set(prev.map(p => p.id));
-                    const newChars = loaded.filter((c: CharacterProfile) => !existingIds.has(c.id));
-                    return [...prev, ...newChars];
-                });
-            } else {
-                alert('JSON format does not match expected CharacterProfile structure.');
-            }
-          }
-        } catch (err) {
-          alert('Invalid JSON file');
-        }
+      const newChar: CharacterProfile = {
+        id: Date.now().toString(),
+        name: charForm.name,
+        description: charForm.description,
+        visualDetails: charForm.visualDetails,
+        artStyle: charForm.artStyle,
+        referenceImages: charForm.referenceImages,
+        generatedPortraits: [charForm.currentPreview!]
       };
-      reader.readAsText(file);
+      
+      onAddCharacter(newChar);
+      setIsCharacterModalOpen(false);
     }
   };
 
@@ -264,7 +211,7 @@ export const Storyboard: React.FC<StoryboardProps> = ({ sceneElements, onBack })
       
       {/* Character Creation Modal */}
       {isCharacterModalOpen && (
-        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[50] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col md:flex-row">
             
             {/* Form Side */}
@@ -377,91 +324,6 @@ export const Storyboard: React.FC<StoryboardProps> = ({ sceneElements, onBack })
         </div>
       )}
 
-      {/* Character List View Modal */}
-      {isCharacterListOpen && (
-        <div className="fixed inset-0 z-[60] bg-black/95 backdrop-blur-md flex flex-col">
-            <div className="flex items-center justify-between p-6 border-b border-zinc-800 bg-zinc-900">
-                <div className="flex items-center gap-3">
-                    <Users className="w-6 h-6 text-emerald-500" />
-                    <h2 className="text-2xl font-bold">Character List</h2>
-                    <span className="text-zinc-500 text-sm bg-zinc-800 px-2 py-0.5 rounded-full">{savedCharacters.length}</span>
-                </div>
-                <div className="flex items-center gap-4">
-                     <button onClick={handleDownloadCharacters} title="Export Library" className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-sm text-zinc-300">
-                        <Download className="w-4 h-4" /> Export
-                     </button>
-                     <label title="Import Library" className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-sm text-zinc-300 cursor-pointer">
-                        <Upload className="w-4 h-4" /> Import
-                        <input type="file" accept=".json" onChange={handleUploadCharacters} className="hidden" />
-                     </label>
-                    <button onClick={() => setIsCharacterListOpen(false)} className="p-2 hover:bg-zinc-800 rounded-full">
-                        <X className="w-6 h-6 text-zinc-400" />
-                    </button>
-                </div>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-8">
-                {savedCharacters.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-zinc-500 space-y-4">
-                        <User className="w-16 h-16 opacity-20" />
-                        <p>No characters saved yet. Create one from the script!</p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-7xl mx-auto">
-                        {savedCharacters.map(char => (
-                            <div key={char.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden flex flex-col md:flex-row h-auto md:h-80 shadow-lg">
-                                {/* Image Gallery Scroll */}
-                                <div className="md:w-1/2 bg-black relative group">
-                                    <div className="h-full w-full overflow-y-auto snap-y snap-mandatory custom-scrollbar">
-                                        {char.generatedPortraits.map((img, idx) => (
-                                            <div key={idx} className="h-full w-full snap-center flex items-center justify-center bg-black relative border-b border-zinc-900/50 last:border-0">
-                                                <img src={img.image_url} className="max-h-full max-w-full object-contain" />
-                                                <span className="absolute bottom-2 right-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded backdrop-blur-sm">
-                                                    {idx + 1}/{char.generatedPortraits.length}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                                
-                                {/* Info */}
-                                <div className="md:w-1/2 p-6 overflow-y-auto">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <h3 className="text-xl font-bold text-white">{char.name}</h3>
-                                        <span className="text-[10px] uppercase tracking-wider bg-zinc-800 text-zinc-400 px-2 py-1 rounded">
-                                            {char.artStyle}
-                                        </span>
-                                    </div>
-                                    
-                                    <div className="space-y-4">
-                                        <div>
-                                            <h4 className="text-xs font-semibold text-emerald-500 uppercase mb-1">Description</h4>
-                                            <p className="text-sm text-zinc-300 leading-relaxed">{char.description}</p>
-                                        </div>
-                                        <div>
-                                            <h4 className="text-xs font-semibold text-emerald-500 uppercase mb-1">Visual Details</h4>
-                                            <p className="text-sm text-zinc-300 leading-relaxed">{char.visualDetails}</p>
-                                        </div>
-                                        {char.referenceImages.length > 0 && (
-                                            <div>
-                                                 <h4 className="text-xs font-semibold text-zinc-500 uppercase mb-2">Reference Images</h4>
-                                                 <div className="flex gap-2">
-                                                     {char.referenceImages.map((ref, i) => (
-                                                         <img key={i} src={ref} className="w-10 h-10 rounded object-cover border border-zinc-700 opacity-60 hover:opacity-100 transition-opacity" />
-                                                     ))}
-                                                 </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-        </div>
-      )}
-
       {/* Floating Selection Menu */}
       {selectionMenu && (
         <div 
@@ -511,7 +373,7 @@ export const Storyboard: React.FC<StoryboardProps> = ({ sceneElements, onBack })
         {/* Character Bank Controls */}
         <div className="flex items-center space-x-2">
             <button 
-                onClick={() => setIsCharacterListOpen(true)}
+                onClick={onOpenCharacterList}
                 className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 rounded-md text-sm transition-colors border border-zinc-700"
             >
                 <Users className="w-4 h-4" />

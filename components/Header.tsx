@@ -1,7 +1,11 @@
 import React from 'react';
-import { FileText, Save } from 'lucide-react';
+import { FileText, Save, Users } from 'lucide-react';
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+  onOpenCharacterList: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ onOpenCharacterList }) => {
   return (
     <header className="w-full border-b border-zinc-800 bg-zinc-900/90 backdrop-blur-md z-50 h-14 flex-none">
       <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
@@ -14,6 +18,13 @@ export const Header: React.FC = () => {
           </h1>
         </div>
         <div className="flex items-center space-x-4">
+          <button 
+            onClick={onOpenCharacterList}
+            className="flex items-center space-x-2 text-xs font-medium px-3 py-1.5 rounded-md bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors border border-zinc-700"
+          >
+            <Users className="w-3 h-3" />
+            <span>Characters</span>
+          </button>
           <button className="flex items-center space-x-2 text-xs font-medium px-3 py-1.5 rounded-md bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors">
             <Save className="w-3 h-3" />
             <span>Auto-Saved</span>
