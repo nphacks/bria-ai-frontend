@@ -20,6 +20,12 @@ export interface Screenplay {
 
 export type ArtStyle = 'Cinematic/Digital' | 'Pencil Sketch' | 'Oil Painting' | 'Watercolor' | 'Ink Illustration';
 
+export interface GeneratedImage {
+  image_url: string;
+  seed?: number;
+  structured_prompt?: any;
+}
+
 export interface CharacterProfile {
   id: string;
   name: string;
@@ -27,5 +33,5 @@ export interface CharacterProfile {
   visualDetails: string;
   artStyle: ArtStyle;
   referenceImages: string[]; // Base64 strings
-  generatedPortraits: string[]; // Array of result images (Base64/URL)
+  generatedPortraits: GeneratedImage[]; // Array of result image objects
 }

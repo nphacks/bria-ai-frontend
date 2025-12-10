@@ -1,4 +1,6 @@
-export const generateImage = async (prompt: string, referenceImages?: string[]): Promise<string> => {
+import { GeneratedImage } from '../types';
+
+export const generateImage = async (prompt: string, referenceImages?: string[]): Promise<GeneratedImage> => {
   try {
     const response = await fetch('http://localhost:8000/generate', {
       method: 'POST',
@@ -18,7 +20,8 @@ export const generateImage = async (prompt: string, referenceImages?: string[]):
       throw new Error('No image URL returned from backend');
     }
 
-    return data.image_url;
+    // Return the full object to capture seed, structured_prompt, etc.
+    return data as GeneratedImage;
   } catch (error) {
     console.error('Generation failed:', error);
     throw error;

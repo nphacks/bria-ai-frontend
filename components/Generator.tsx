@@ -1,10 +1,11 @@
 import React, { useState, useCallback } from 'react';
 import { Send, Loader2, Image as ImageIcon, AlertCircle, Download, ExternalLink } from 'lucide-react';
 import { generateImage } from '../services/apiService';
+import { GeneratedImage } from '../types';
 
 export const Generator: React.FC = () => {
   const [prompt, setPrompt] = useState<string>('');
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageData, setImageData] = useState<GeneratedImage | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -14,11 +15,11 @@ export const Generator: React.FC = () => {
 
     setIsLoading(true);
     setError(null);
-    setImageUrl(null);
+    setImageData(null);
 
     try {
-      const url = await generateImage(prompt);
-      setImageUrl(url);
+      const data = await generateImage(prompt);
+      setImageData(data);
     } catch (err: any) {
       setError(err.message || 'Failed to generate image. Please try again.');
     } finally {
@@ -27,9 +28,9 @@ export const Generator: React.FC = () => {
   };
 
   const handleDownload = useCallback(async () => {
-    if (!imageUrl) return;
+    if (!imageData?.image_url) return;
     try {
-      const response = await fetch(imageUrl);
+      const response = await fetch(imageData.image_url);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -42,7 +43,7 @@ export const Generator: React.FC = () => {
     } catch (err) {
       console.error('Failed to download image', err);
     }
-  }, [imageUrl]);
+  }, [imageData]);
 
   return (
     <div className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -118,10 +119,10 @@ export const Generator: React.FC = () => {
 
       {/* Right Column: Image Display */}
       <div className="relative aspect-square lg:aspect-auto lg:h-full bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden shadow-2xl flex flex-col items-center justify-center group">
-        {imageUrl ? (
+        {imageData ? (
           <>
             <img
-              src={imageUrl}
+              src={imageData.image_url}
               alt={prompt}
               className="w-full h-full object-cover animate-in fade-in zoom-in duration-500"
             />
@@ -136,7 +137,7 @@ export const Generator: React.FC = () => {
                   <span>Download</span>
                 </button>
                 <a
-                  href={imageUrl}
+                  href={imageData.image_url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white p-2 rounded-lg transition-colors border border-white/10"

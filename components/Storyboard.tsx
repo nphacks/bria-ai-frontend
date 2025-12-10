@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ScriptElement, CharacterProfile, ArtStyle } from '../types';
+import { ScriptElement, CharacterProfile, ArtStyle, GeneratedImage } from '../types';
 import { ArrowLeft, Loader2, Image as ImageIcon, Clapperboard, User, Film, Sparkles, X, Upload, Save, Download, Plus, Users, ChevronRight, ChevronLeft } from 'lucide-react';
 import { generateImage } from '../services/apiService';
 
@@ -21,7 +21,7 @@ interface CharacterFormState {
   visualDetails: string;
   artStyle: ArtStyle;
   referenceImages: string[];
-  currentPreview: string | null; // Single image being generated right now
+  currentPreview: GeneratedImage | null; // Single image being generated right now
 }
 
 const ART_STYLES: ArtStyle[] = [
@@ -34,7 +34,7 @@ const ART_STYLES: ArtStyle[] = [
 
 export const Storyboard: React.FC<StoryboardProps> = ({ sceneElements, onBack }) => {
   // Main Visualization State
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [generatedScene, setGeneratedScene] = useState<GeneratedImage | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [generationType, setGenerationType] = useState<'SCENE' | 'CHARACTER' | 'FULL_SCENE'>('FULL_SCENE');
   const [promptUsed, setPromptUsed] = useState<string>('');
@@ -106,8 +106,6 @@ export const Storyboard: React.FC<StoryboardProps> = ({ sceneElements, onBack })
   // --- Character Logic ---
 
   const handleOpenCharacterModal = (selectedText: string) => {
-    // Check if character already exists to pre-fill details? 
-    // For now, simpler to start fresh or let user type name to match later.
     setCharForm({
       name: selectedText,
       description: selectedText,
@@ -149,8 +147,8 @@ export const Storyboard: React.FC<StoryboardProps> = ({ sceneElements, onBack })
       Ensure consistency with provided reference images if any.
       High quality, detailed character portrait.`;
 
-      const url = await generateImage(prompt, referenceImages);
-      setCharForm(prev => ({ ...prev, currentPreview: url }));
+      const result = await generateImage(prompt, referenceImages);
+      setCharForm(prev => ({ ...prev, currentPreview: result }));
     } catch (error) {
       console.error(error);
       alert('Failed to generate character preview.');
@@ -171,14 +169,10 @@ export const Storyboard: React.FC<StoryboardProps> = ({ sceneElements, onBack })
           
           updatedCharacters[existingIndex] = {
             ...existingChar,
-            // Update description/details if they were changed in the form, otherwise keep old? 
-            // Let's overwrite with new details as user might have refined them.
             description: charForm.description,
             visualDetails: charForm.visualDetails,
             artStyle: charForm.artStyle,
-            // Merge reference images unique
             referenceImages: [...new Set([...existingChar.referenceImages, ...charForm.referenceImages])],
-            // Append new portrait
             generatedPortraits: [charForm.currentPreview!, ...existingChar.generatedPortraits]
           };
           return updatedCharacters;
@@ -222,13 +216,12 @@ export const Storyboard: React.FC<StoryboardProps> = ({ sceneElements, onBack })
             const valid = loaded.every(c => c.name && Array.isArray(c.generatedPortraits));
             if (valid) {
                 setSavedCharacters(prev => {
-                    // Merge strategies could vary, for now just append unique IDs
                     const existingIds = new Set(prev.map(p => p.id));
                     const newChars = loaded.filter((c: CharacterProfile) => !existingIds.has(c.id));
                     return [...prev, ...newChars];
                 });
             } else {
-                alert('JSON format does not match expected CharacterProfile structure (v2).');
+                alert('JSON format does not match expected CharacterProfile structure.');
             }
           }
         } catch (err) {
@@ -257,8 +250,8 @@ export const Storyboard: React.FC<StoryboardProps> = ({ sceneElements, onBack })
       } else {
          finalPrompt = `Cinematic storyboard frame, movie still, 8k: ${text}`;
       }
-      const url = await generateImage(finalPrompt);
-      setImageUrl(url);
+      const result = await generateImage(finalPrompt);
+      setGeneratedScene(result);
     } catch (error) {
       console.error("Failed to generate", error);
     } finally {
@@ -362,7 +355,7 @@ export const Storyboard: React.FC<StoryboardProps> = ({ sceneElements, onBack })
             <div className="p-6 md:w-1/2 bg-black flex flex-col items-center justify-center relative border-l border-zinc-800 min-h-[300px]">
               {charForm.currentPreview ? (
                 <>
-                  <img src={charForm.currentPreview} alt="Preview" className="w-full h-full object-contain max-h-[400px] rounded" />
+                  <img src={charForm.currentPreview.image_url} alt="Preview" className="w-full h-full object-contain max-h-[400px] rounded" />
                   <div className="absolute bottom-6 flex gap-2">
                      <button 
                         onClick={handleSaveCharacter}
@@ -422,7 +415,7 @@ export const Storyboard: React.FC<StoryboardProps> = ({ sceneElements, onBack })
                                     <div className="h-full w-full overflow-y-auto snap-y snap-mandatory custom-scrollbar">
                                         {char.generatedPortraits.map((img, idx) => (
                                             <div key={idx} className="h-full w-full snap-center flex items-center justify-center bg-black relative border-b border-zinc-900/50 last:border-0">
-                                                <img src={img} className="max-h-full max-w-full object-contain" />
+                                                <img src={img.image_url} className="max-h-full max-w-full object-contain" />
                                                 <span className="absolute bottom-2 right-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded backdrop-blur-sm">
                                                     {idx + 1}/{char.generatedPortraits.length}
                                                 </span>
@@ -527,6 +520,13 @@ export const Storyboard: React.FC<StoryboardProps> = ({ sceneElements, onBack })
                     <span className="bg-emerald-600 text-white text-[10px] px-1.5 rounded-full">{savedCharacters.length}</span>
                 )}
             </button>
+            <div className="h-4 w-px bg-zinc-700 mx-1"></div>
+            <div className="flex items-center gap-1">
+                {savedCharacters.slice(0, 3).map(char => (
+                    <img key={char.id} src={char.generatedPortraits[0]?.image_url || ''} className="w-8 h-8 rounded-full border border-zinc-600 object-cover" title={char.name} />
+                ))}
+                {savedCharacters.length > 3 && <span className="text-xs text-zinc-500">+{savedCharacters.length - 3}</span>}
+            </div>
         </div>
       </div>
 
@@ -559,10 +559,10 @@ export const Storyboard: React.FC<StoryboardProps> = ({ sceneElements, onBack })
         {/* Right: Visualization */}
         <div className="w-2/3 p-12 flex flex-col items-center justify-center bg-zinc-950 relative">
           
-          {imageUrl ? (
+          {generatedScene ? (
             <div className="w-full max-w-4xl flex flex-col gap-4 animate-in fade-in zoom-in duration-300">
                 <div className="relative group w-full aspect-video rounded-lg overflow-hidden shadow-2xl border border-zinc-800 bg-black">
-                    <img src={imageUrl} alt="Storyboard" className="w-full h-full object-contain" />
+                    <img src={generatedScene.image_url} alt="Storyboard" className="w-full h-full object-contain" />
                 </div>
                 <div className="flex justify-between items-start text-sm">
                     <div className="flex items-center gap-2">
