@@ -27,5 +27,5 @@ export interface CharacterProfile {
   visualDetails: string;
   artStyle: ArtStyle;
   referenceImages: string[]; // Base64 strings
-  generatedPortrait: string | null; // URL or Base64 of final result
+  generatedPortraits: string[]; // Array of result images (Base64/URL)
 }
