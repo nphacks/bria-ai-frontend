@@ -20,7 +20,7 @@ export const Generator: React.FC = () => {
       const url = await generateImage(prompt);
       setImageUrl(url);
     } catch (err: any) {
-      setError(err.message || 'Failed to generate image. Please ensure the backend is running at localhost:8000');
+      setError(err.message || 'Failed to generate image. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -53,7 +53,7 @@ export const Generator: React.FC = () => {
             Visualize your ideas.
           </h2>
           <p className="text-gray-400">
-            Enter a descriptive prompt below to generate high-quality images using our custom backend engine.
+            Enter a descriptive prompt below to generate high-quality images using Gemini.
           </p>
         </div>
 
@@ -161,7 +161,7 @@ export const Generator: React.FC = () => {
             </p>
             <p className="text-sm text-gray-500 max-w-xs">
               {isLoading
-                ? 'This might take a few seconds. Connecting to localhost backend...'
+                ? 'This might take a few seconds...'
                 : 'Your generated image will appear here in high resolution.'}
             </p>
           </div>

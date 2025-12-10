@@ -1,28 +1,21 @@
-import { GenerateRequest, GenerateResponse } from '../types';
-
-const API_URL = 'http://localhost:8000';
-
-export const generateImage = async (prompt: string): Promise<string> => {
+export const generateImage = async (prompt: string, referenceImages?: string[]): Promise<string> => {
   try {
-    const payload: GenerateRequest = { prompt };
-    
-    const response = await fetch(`${API_URL}/generate`, {
+    const response = await fetch('http://localhost:8000/generate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ prompt, referenceImages }),
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Server error ${response.status}: ${errorText || response.statusText}`);
+      throw new Error(`Backend error: ${response.statusText}`);
     }
 
-    const data: GenerateResponse = await response.json();
+    const data = await response.json();
     
     if (!data.image_url) {
-      throw new Error('Invalid response format: Missing image_url');
+      throw new Error('No image URL returned from backend');
     }
 
     return data.image_url;

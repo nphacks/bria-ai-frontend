@@ -1,11 +1,31 @@
-export interface GenerateRequest {
-  prompt: string;
+export type ScriptElementType = 
+  | 'SCENE_HEADING'
+  | 'ACTION'
+  | 'CHARACTER'
+  | 'DIALOGUE'
+  | 'PARENTHETICAL'
+  | 'TRANSITION';
+
+export interface ScriptElement {
+  id: string;
+  type: ScriptElementType;
+  content: string;
+  sceneNumber?: number;
 }
 
-export interface GenerateResponse {
-  image_url: string;
+export interface Screenplay {
+  title: string;
+  elements: ScriptElement[];
 }
 
-export interface ApiError {
-  message: string;
+export type ArtStyle = 'Cinematic/Digital' | 'Pencil Sketch' | 'Oil Painting' | 'Watercolor' | 'Ink Illustration';
+
+export interface CharacterProfile {
+  id: string;
+  name: string;
+  description: string;
+  visualDetails: string;
+  artStyle: ArtStyle;
+  referenceImages: string[]; // Base64 strings
+  generatedPortrait: string | null; // URL or Base64 of final result
 }
