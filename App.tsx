@@ -4,6 +4,7 @@ import { Header } from './components/Header';
 import { Storyboard } from './components/Storyboard';
 import { CharacterListModal } from './components/CharacterListModal';
 import { ScriptElement, CharacterProfile, GeneratedImage, ProjectData } from './types';
+import { normalizeGeneratedImage } from './services/apiService';
 
 type ViewState = 'EDITOR' | 'STORYBOARD';
 
@@ -69,8 +70,25 @@ const App: React.FC = () => {
             // Basic validation check
             if (data.screenplay && Array.isArray(data.screenplay)) {
                 setElements(data.screenplay);
-                setSavedCharacters(data.characters || []);
-                setStoryboards(data.storyboards || {});
+                
+                // Normalize characters data structure
+                const cleanCharacters = (data.characters || []).map((c: any) => ({
+                    ...c,
+                    generatedPortraits: Array.isArray(c.generatedPortraits) 
+                        ? c.generatedPortraits.map(normalizeGeneratedImage) 
+                        : []
+                }));
+                setSavedCharacters(cleanCharacters);
+
+                // Normalize storyboards data structure
+                const cleanStoryboards: Record<string, GeneratedImage> = {};
+                if (data.storyboards) {
+                    Object.entries(data.storyboards).forEach(([k, v]) => {
+                        cleanStoryboards[k] = normalizeGeneratedImage(v);
+                    });
+                }
+                setStoryboards(cleanStoryboards);
+
             } else {
                 alert("Invalid project file format.");
             }

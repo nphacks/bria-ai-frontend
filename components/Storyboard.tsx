@@ -68,21 +68,6 @@ export const Storyboard: React.FC<StoryboardProps> = ({
     currentPreview: null
   });
 
-  // Helper to extract URL regardless of nesting depth
-  const getImageSrc = (img: any): string => {
-    if (!img) return '';
-    if (typeof img === 'string') return img;
-    // Check for nested object structure as requested
-    if (img.image_url && typeof img.image_url === 'object' && img.image_url.image_url) {
-        return img.image_url.image_url;
-    }
-    // Standard structure
-    if (img.image_url && typeof img.image_url === 'string') {
-        return img.image_url;
-    }
-    return '';
-  };
-
   // Sync state with prop if prop changes (e.g. navigation or update)
   useEffect(() => {
     if (existingStoryboard) {
@@ -334,7 +319,7 @@ export const Storyboard: React.FC<StoryboardProps> = ({
             <div className="p-6 md:w-1/2 bg-black flex flex-col items-center justify-center relative border-l border-zinc-800 min-h-[300px]">
               {charForm.currentPreview ? (
                 <>
-                  <img src={getImageSrc(charForm.currentPreview)} alt="Preview" className="w-full h-full object-contain max-h-[400px] rounded" />
+                  <img src={charForm.currentPreview.image_url} alt="Preview" className="w-full h-full object-contain max-h-[400px] rounded" />
                   <div className="absolute bottom-6 flex gap-2">
                      <button 
                         onClick={handleSaveCharacter}
@@ -417,7 +402,7 @@ export const Storyboard: React.FC<StoryboardProps> = ({
             <div className="h-4 w-px bg-zinc-700 mx-1"></div>
             <div className="flex items-center gap-1">
                 {savedCharacters.slice(0, 3).map(char => (
-                    <img key={char.id} src={getImageSrc(char.generatedPortraits[0])} className="w-8 h-8 rounded-full border border-zinc-600 object-cover" title={char.name} />
+                    <img key={char.id} src={char.generatedPortraits[0].image_url} className="w-8 h-8 rounded-full border border-zinc-600 object-cover" title={char.name} />
                 ))}
                 {savedCharacters.length > 3 && <span className="text-xs text-zinc-500">+{savedCharacters.length - 3}</span>}
             </div>
@@ -456,7 +441,7 @@ export const Storyboard: React.FC<StoryboardProps> = ({
           {generatedScene ? (
             <div className="w-full max-w-4xl flex flex-col gap-4 animate-in fade-in zoom-in duration-300">
                 <div className="relative group w-full aspect-video rounded-lg overflow-hidden shadow-2xl border border-zinc-800 bg-black">
-                    <img src={getImageSrc(generatedScene)} alt="Storyboard" className="w-full h-full object-contain" />
+                    <img src={generatedScene.image_url} alt="Storyboard" className="w-full h-full object-contain" />
                 </div>
                 <div className="flex justify-between items-start text-sm">
                     <div className="flex items-center gap-2">

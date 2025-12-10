@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { CharacterProfile } from '../types';
 import { Users, Download, Upload, X, ChevronLeft, ImageIcon, Sparkles, Loader2, Wand2, CheckCircle2, User } from 'lucide-react';
-import { generateImage } from '../services/apiService';
+import { generateImage, normalizeGeneratedImage } from '../services/apiService';
 
 interface CharacterListModalProps {
   isOpen: boolean;
@@ -24,21 +24,6 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
   const [isGeneratingNew, setIsGeneratingNew] = useState(false);
 
   const activeCharacter = characters.find(c => c.id === activeCharacterId);
-
-  // Helper to extract URL regardless of nesting depth
-  const getImageSrc = (img: any): string => {
-    if (!img) return '';
-    if (typeof img === 'string') return img;
-    // Check for nested object structure as requested
-    if (img.image_url && typeof img.image_url === 'object' && img.image_url.image_url) {
-        return img.image_url.image_url;
-    }
-    // Standard structure
-    if (img.image_url && typeof img.image_url === 'string') {
-        return img.image_url;
-    }
-    return '';
-  };
 
   if (!isOpen) return null;
 
@@ -64,7 +49,14 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
             if (valid) {
                 const existingIds = new Set(characters.map(p => p.id));
                 const newChars = loaded.filter((c: CharacterProfile) => !existingIds.has(c.id));
-                onImportCharacters([...characters, ...newChars]);
+                
+                // Normalize imported characters to ensure flat image structure
+                const normalizedNewChars = newChars.map((c: any) => ({
+                    ...c,
+                    generatedPortraits: c.generatedPortraits.map(normalizeGeneratedImage)
+                }));
+
+                onImportCharacters([...characters, ...normalizedNewChars]);
             } else {
                 alert('JSON format does not match expected CharacterProfile structure.');
             }
@@ -196,8 +188,8 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
                          <div className="flex-1 overflow-y-auto custom-scrollbar p-1">
                              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                                  {activeCharacter.generatedPortraits.map((img, idx) => {
-                                     // Use helper to resolve URL from potential nested objects
-                                     const imgUrl = getImageSrc(img);
+                                     // Direct access now safe due to normalization
+                                     const imgUrl = img.image_url;
                                      const isSelected = selectedReferenceUrls.includes(imgUrl);
                                      
                                      return (
@@ -314,8 +306,8 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
                                     <div className="aspect-square bg-black relative overflow-hidden">
                                         {char.generatedPortraits[0] ? (
                                             <img 
-                                                // Robust check for first image URL
-                                                src={getImageSrc(char.generatedPortraits[0])} 
+                                                // Direct access due to normalization
+                                                src={char.generatedPortraits[0].image_url} 
                                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                                             />
                                         ) : (
