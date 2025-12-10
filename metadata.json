@@ -1,0 +1,5 @@
+{
+  "name": "BriaGen Client",
+  "description": "A sleek, modern client for generating photorealistic images via a custom backend.",
+  "requestFramePermissions": []
+}
