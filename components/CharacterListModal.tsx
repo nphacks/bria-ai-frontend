@@ -181,16 +181,19 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
                          <div className="flex-1 overflow-y-auto custom-scrollbar p-1">
                              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                                  {activeCharacter.generatedPortraits.map((img, idx) => {
-                                     const isSelected = selectedReferenceUrls.includes(img.image_url);
+                                     // Robust check: use .image_url if object, or assume string if legacy
+                                     const imgUrl = typeof img === 'string' ? img : img.image_url;
+                                     const isSelected = selectedReferenceUrls.includes(imgUrl);
+                                     
                                      return (
                                          <div 
                                             key={idx} 
-                                            onClick={() => toggleReferenceImage(img.image_url)}
+                                            onClick={() => toggleReferenceImage(imgUrl)}
                                             className={`relative group aspect-square rounded-lg overflow-hidden border-2 cursor-pointer transition-all ${
                                                 isSelected ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-zinc-800 hover:border-zinc-600'
                                             }`}
                                          >
-                                             <img src={img.image_url} alt="" className="w-full h-full object-cover" />
+                                             <img src={imgUrl} alt="" className="w-full h-full object-cover" />
                                              {isSelected && (
                                                  <div className="absolute top-2 right-2 bg-emerald-500 text-black rounded-full p-1 shadow-lg">
                                                      <CheckCircle2 className="w-4 h-4" />
@@ -296,7 +299,8 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
                                     <div className="aspect-square bg-black relative overflow-hidden">
                                         {char.generatedPortraits[0] ? (
                                             <img 
-                                                src={char.generatedPortraits[0].image_url} 
+                                                // Robust check for first image URL
+                                                src={typeof char.generatedPortraits[0] === 'string' ? char.generatedPortraits[0] : char.generatedPortraits[0].image_url} 
                                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                                             />
                                         ) : (

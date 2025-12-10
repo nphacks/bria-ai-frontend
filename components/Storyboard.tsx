@@ -9,6 +9,8 @@ interface StoryboardProps {
   savedCharacters: CharacterProfile[];
   onAddCharacter: (char: CharacterProfile) => void;
   onOpenCharacterList: () => void;
+  existingStoryboard: GeneratedImage | undefined;
+  onUpdateStoryboard: (image: GeneratedImage) => void;
 }
 
 interface SelectionMenu {
@@ -39,10 +41,12 @@ export const Storyboard: React.FC<StoryboardProps> = ({
   onBack, 
   savedCharacters,
   onAddCharacter,
-  onOpenCharacterList
+  onOpenCharacterList,
+  existingStoryboard,
+  onUpdateStoryboard
 }) => {
   // Main Visualization State
-  const [generatedScene, setGeneratedScene] = useState<GeneratedImage | null>(null);
+  const [generatedScene, setGeneratedScene] = useState<GeneratedImage | null>(existingStoryboard || null);
   const [isLoading, setIsLoading] = useState(false);
   const [generationType, setGenerationType] = useState<'SCENE' | 'CHARACTER' | 'FULL_SCENE'>('FULL_SCENE');
   const [promptUsed, setPromptUsed] = useState<string>('');
@@ -63,6 +67,13 @@ export const Storyboard: React.FC<StoryboardProps> = ({
     referenceImages: [],
     currentPreview: null
   });
+
+  // Sync state with prop if prop changes (e.g. navigation or update)
+  useEffect(() => {
+    if (existingStoryboard) {
+        setGeneratedScene(existingStoryboard);
+    }
+  }, [existingStoryboard]);
 
   // Handle outside clicks to close menu
   useEffect(() => {
@@ -199,6 +210,12 @@ export const Storyboard: React.FC<StoryboardProps> = ({
       }
       const result = await generateImage(finalPrompt);
       setGeneratedScene(result);
+      
+      // If we generated a scene or full scene, save it as the storyboard for this scene
+      if (type === 'SCENE' || type === 'FULL_SCENE') {
+          onUpdateStoryboard(result);
+      }
+
     } catch (error) {
       console.error("Failed to generate", error);
     } finally {

@@ -1,29 +1,18 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { ScriptElement, ScriptElementType } from '../types';
 import { Trash2, ArrowDown, Camera } from 'lucide-react';
 
 interface ScreenplayEditorProps {
+  elements: ScriptElement[];
+  onUpdateElements: (elements: ScriptElement[]) => void;
   onNavigateToStoryboard: (sceneElements: ScriptElement[]) => void;
 }
 
-export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({ onNavigateToStoryboard }) => {
-  const [elements, setElements] = useState<ScriptElement[]>([
-    { id: '1', type: 'SCENE_HEADING', content: 'EXT. OCEAN - DAY', sceneNumber: 1 },
-    { id: '2', type: 'ACTION', content: 'FADE UP on a cold, foggy sky. The only sounds are the lapping of the ocean waves and the distant tolling of a ship\'s bell.' },
-    { id: '3', type: 'ACTION', content: 'Then, chugging out of the thick mist, comes a 1940s TRAWLER.' },
-    { id: '4', type: 'ACTION', content: 'A strange figure wearing a bright green waistcoat and wildly colourful scarf climbs the mast. This is Willy Wonka.' },
-    { id: '5', type: 'ACTION', content: 'As he peers into the fog, he sings A HATFUL OF DREAMS.' },
-    { id: '6', type: 'CHARACTER', content: 'WILLY' },
-    { id: '7', type: 'DIALOGUE', content: 'After seven years of life upon the ocean,' },
-    { id: '8', type: 'DIALOGUE', content: 'It is time to bid the seven seas farewell,' },
-    { id: '9', type: 'DIALOGUE', content: 'And the city I’ve pinned seven years of hopes on' },
-    { id: '10', type: 'DIALOGUE', content: 'Lies just over the horizon. I can hear the harbour bell!' },
-    { id: '11', type: 'ACTION', content: 'He spies a GRAND OLD CITY looming out of the freezing fog.' },
-    { id: '12', type: 'CHARACTER', content: 'WILLY (CONT\'D)' },
-    { id: '13', type: 'DIALOGUE', content: 'Land ahoy!!' },
-    { id: '14', type: 'ACTION', content: 'Willy grabs a rope and ABSEILS DOWN to the deck as the other sailors prepare the boat to come into harbour.' },
-  ]);
-
+export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({ 
+  elements, 
+  onUpdateElements, 
+  onNavigateToStoryboard 
+}) => {
   const [currentInput, setCurrentInput] = useState('');
   const [currentType, setCurrentType] = useState<ScriptElementType>('ACTION');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -34,7 +23,7 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({ onNavigateTo
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [elements]);
+  }, [elements.length]);
 
   const handleAddElement = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -62,7 +51,7 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({ onNavigateTo
       sceneNumber: currentType === 'SCENE_HEADING' ? nextSceneNum : undefined
     };
 
-    setElements([...elements, newElement]);
+    onUpdateElements([...elements, newElement]);
     setCurrentInput('');
     setCurrentType(nextType);
   };
@@ -135,7 +124,7 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({ onNavigateTo
               {el.content}
 
               <button 
-                onClick={() => setElements(elements.filter(e => e.id !== el.id))}
+                onClick={() => onUpdateElements(elements.filter(e => e.id !== el.id))}
                 className="absolute -right-8 top-0 opacity-0 group-hover:opacity-100 p-1 text-zinc-600 hover:text-red-500 transition-opacity"
                 title="Delete line"
               >

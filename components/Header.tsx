@@ -1,11 +1,30 @@
-import React from 'react';
-import { FileText, Save, Users } from 'lucide-react';
+import React, { useRef } from 'react';
+import { FileText, Save, Users, Upload, Download } from 'lucide-react';
 
 interface HeaderProps {
   onOpenCharacterList: () => void;
+  onExportProject: () => void;
+  onImportProject: (file: File) => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenCharacterList }) => {
+export const Header: React.FC<HeaderProps> = ({ 
+  onOpenCharacterList, 
+  onExportProject,
+  onImportProject 
+}) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      onImportProject(file);
+    }
+    // Reset value so same file can be selected again
+    if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <header className="w-full border-b border-zinc-800 bg-zinc-900/90 backdrop-blur-md z-50 h-14 flex-none">
       <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
@@ -17,7 +36,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCharacterList }) => {
             Screenplay Studio
           </h1>
         </div>
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-3">
           <button 
             onClick={onOpenCharacterList}
             className="flex items-center space-x-2 text-xs font-medium px-3 py-1.5 rounded-md bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors border border-zinc-700"
@@ -25,10 +44,29 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCharacterList }) => {
             <Users className="w-3 h-3" />
             <span>Characters</span>
           </button>
-          <button className="flex items-center space-x-2 text-xs font-medium px-3 py-1.5 rounded-md bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors">
-            <Save className="w-3 h-3" />
-            <span>Auto-Saved</span>
+          
+          <div className="h-4 w-px bg-zinc-700 mx-1"></div>
+
+          <button 
+             onClick={onExportProject}
+             className="flex items-center space-x-2 text-xs font-medium px-3 py-1.5 rounded-md bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors"
+             title="Save Project (JSON)"
+          >
+            <Download className="w-3 h-3" />
+            <span>Save</span>
           </button>
+          
+          <label className="flex items-center space-x-2 text-xs font-medium px-3 py-1.5 rounded-md bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors cursor-pointer">
+            <Upload className="w-3 h-3" />
+            <span>Open</span>
+            <input 
+                type="file" 
+                ref={fileInputRef}
+                accept=".json" 
+                onChange={handleFileChange} 
+                className="hidden" 
+            />
+          </label>
         </div>
       </div>
     </header>

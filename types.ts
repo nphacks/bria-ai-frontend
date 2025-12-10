@@ -35,3 +35,9 @@ export interface CharacterProfile {
   referenceImages: string[]; // Base64 strings
   generatedPortraits: GeneratedImage[]; // Array of result image objects
 }
+
+export interface ProjectData {
+  screenplay: ScriptElement[];
+  characters: CharacterProfile[];
+  storyboards: Record<string, GeneratedImage>; // Key is the SCENE_HEADING element ID
+}
