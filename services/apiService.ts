@@ -9,18 +9,31 @@ export const normalizeGeneratedImage = (data: any): GeneratedImage => {
     return { image_url: data };
   }
 
+  let result: GeneratedImage;
+
   // Handle nested image_url object
   if (data.image_url && typeof data.image_url === 'object') {
     const nested = data.image_url;
-    return {
+    result = {
       ...data,       // Keep parent props
       ...nested,     // Merge nested props (like seed, structured_prompt)
       image_url: nested.image_url || '' // Flatten the actual URL
     } as GeneratedImage;
+  } else {
+    // Already correct structure
+    result = data as GeneratedImage;
   }
 
-  // Already correct structure
-  return data as GeneratedImage;
+  // Ensure structured_prompt is an object, not a string
+  if (result.structured_prompt && typeof result.structured_prompt === 'string') {
+    try {
+      result.structured_prompt = JSON.parse(result.structured_prompt);
+    } catch (e) {
+      console.warn('Failed to parse structured_prompt in normalize', e);
+    }
+  }
+
+  return result;
 };
 
 export const generateImage = async (prompt: string, referenceImages?: (string | GeneratedImage)[]): Promise<GeneratedImage> => {
@@ -50,7 +63,16 @@ export const generateImage = async (prompt: string, referenceImages?: (string | 
              seeds.push(ref.seed);
           }
           if (ref.structured_prompt) {
-             structured_prompts.push(ref.structured_prompt);
+             let sp = ref.structured_prompt;
+             // Ensure it is parsed if it represents a JSON string
+             if (typeof sp === 'string') {
+                 try {
+                     sp = JSON.parse(sp);
+                 } catch (e) {
+                     console.warn("Failed to parse structured_prompt during generation prep", e);
+                 }
+             }
+             structured_prompts.push(sp);
           }
         }
       });
