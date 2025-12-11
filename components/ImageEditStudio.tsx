@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, Wand2, Eraser, Move, Undo2, Download, RefreshCw, Layers, Check, X, Sparkles } from 'lucide-react';
 import { GeneratedImage } from '../types';
-import { eraseImage, generativeFill } from '../services/apiService';
+import { eraseImage, generativeFill, removeBackground } from '../services/apiService';
 
 interface ImageEditStudioProps {
   image: GeneratedImage | null;
@@ -12,7 +12,7 @@ interface ImageEditStudioProps {
 export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initialImage, onBack, onSave }) => {
   const [currentImage, setCurrentImage] = useState<GeneratedImage | null>(initialImage);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTool, setActiveTool] = useState<'move' | 'eraser' | 'gen_fill'>('move');
+  const [activeTool, setActiveTool] = useState<'move' | 'eraser' | 'gen_fill' | 'remove_bg'>('move');
   const [brushSize, setBrushSize] = useState(50);
   const [genFillPrompt, setGenFillPrompt] = useState('');
   
@@ -141,28 +141,35 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initial
   };
 
   const handleApplyTool = async () => {
-    if (!currentImage || !canvasRef.current || !hasMask) return;
+    if (!currentImage) return;
+    
+    // Validations
+    if (isMaskingTool && (!canvasRef.current || !hasMask)) return;
 
     setIsProcessing(true);
     try {
-        const maskBase64 = canvasRef.current.toDataURL('image/png');
         let result: GeneratedImage;
 
         if (activeTool === 'eraser') {
+            const maskBase64 = canvasRef.current!.toDataURL('image/png');
             result = await eraseImage(currentImage.image_url, maskBase64);
         } else if (activeTool === 'gen_fill') {
+            const maskBase64 = canvasRef.current!.toDataURL('image/png');
             if (!genFillPrompt.trim()) {
                 alert("Please enter a prompt for Generative Fill.");
                 setIsProcessing(false);
                 return;
             }
             result = await generativeFill(currentImage.image_url, maskBase64, genFillPrompt);
+        } else if (activeTool === 'remove_bg') {
+            result = await removeBackground(currentImage.image_url);
         } else {
             return;
         }
         
         setCurrentImage(result);
-        clearCanvas();
+        if (isMaskingTool) clearCanvas();
+        
         setActiveTool('move');
         setGenFillPrompt('');
     } catch (error) {
@@ -211,7 +218,19 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initial
             className="flex-1 bg-zinc-950 relative overflow-hidden flex items-center justify-center p-8 select-none"
             style={{ cursor: isMaskingTool ? 'none' : 'default' }}
           >
-              <div className="relative shadow-2xl rounded-lg overflow-hidden border border-zinc-800 bg-zinc-900/50">
+              <div 
+                className="relative shadow-2xl rounded-lg overflow-hidden border border-zinc-800 bg-zinc-900/50"
+                style={{
+                  backgroundImage: `
+                    linear-gradient(45deg, #1f1f23 25%, transparent 25%), 
+                    linear-gradient(-45deg, #1f1f23 25%, transparent 25%), 
+                    linear-gradient(45deg, transparent 75%, #1f1f23 75%), 
+                    linear-gradient(-45deg, transparent 75%, #1f1f23 75%)
+                  `,
+                  backgroundSize: '20px 20px',
+                  backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
+                }}
+              >
                   {/* Base Image */}
                   {currentImage && (
                       <img 
@@ -289,10 +308,18 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initial
                       <button 
                         onClick={() => setActiveTool('gen_fill')}
                         disabled={hasUnsavedChanges}
-                        className={`p-4 col-span-2 rounded-xl border flex flex-row items-center justify-center gap-3 transition-all ${activeTool === 'gen_fill' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
+                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'gen_fill' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
                       >
-                          <Sparkles className="w-5 h-5" />
-                          <span className="text-xs font-medium">Generative Fill</span>
+                          <Sparkles className="w-6 h-6" />
+                          <span className="text-xs font-medium">Gen Fill</span>
+                      </button>
+                      <button 
+                        onClick={() => setActiveTool('remove_bg')}
+                        disabled={hasUnsavedChanges}
+                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'remove_bg' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
+                      >
+                          <Layers className="w-6 h-6" />
+                          <span className="text-xs font-medium">Remove BG</span>
                       </button>
                   </div>
               </div>
@@ -362,6 +389,30 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initial
                                 ? 'Paint over the area you want to modify, describe the change, and generate.' 
                                 : 'Paint over the area you want to remove. The AI will fill it based on context.'}
                         </p>
+                    </div>
+                )}
+                
+                {/* Remove BG Controls */}
+                {activeTool === 'remove_bg' && !hasUnsavedChanges && (
+                    <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-6">
+                        <div className="p-4 bg-zinc-950/50 rounded-xl border border-zinc-800">
+                             <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                                <Layers className="w-4 h-4 text-indigo-500" />
+                                Remove Background
+                             </h4>
+                             <p className="text-xs text-zinc-400 leading-relaxed">
+                                Automatically detect the main subject and remove the background, leaving it transparent.
+                             </p>
+                        </div>
+                        
+                        <button 
+                            onClick={handleApplyTool}
+                            disabled={isProcessing}
+                            className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20"
+                        >
+                            <Layers className="w-4 h-4" />
+                            Remove Background
+                        </button>
                     </div>
                 )}
               </div>
