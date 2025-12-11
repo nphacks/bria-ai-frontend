@@ -67,6 +67,31 @@ const App: React.FC = () => {
       setSelectedImageForEdit(null);
   };
 
+  const handleSaveEditedImage = (originalImage: GeneratedImage, newImage: GeneratedImage) => {
+    // Update Characters
+    setSavedCharacters(prev => prev.map(char => ({
+        ...char,
+        generatedPortraits: char.generatedPortraits.map(img => 
+            img.image_url === originalImage.image_url ? newImage : img
+        )
+    })));
+
+    // Update Storyboards
+    setStoryboards(prev => {
+        const next = { ...prev };
+        Object.keys(next).forEach(key => {
+            next[key] = next[key].map(item => ({
+                ...item,
+                image: item.image.image_url === originalImage.image_url ? newImage : item.image
+            }));
+        });
+        return next;
+    });
+
+    // Update the currently selected image reference so the UI reflects the save immediately
+    setSelectedImageForEdit(newImage);
+  };
+
   // --- Project Import / Export ---
   const handleExportProject = () => {
     const projectData: ProjectData = {
@@ -216,6 +241,7 @@ const App: React.FC = () => {
           <ImageEditStudio 
             image={selectedImageForEdit}
             onBack={handleBackFromEditStudio}
+            onSave={handleSaveEditedImage}
           />
         )}
       </main>
