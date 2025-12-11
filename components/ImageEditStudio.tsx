@@ -18,19 +18,35 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initial
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cursorRef = useRef<HTMLDivElement>(null);
   
   // Drawing State
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasMask, setHasMask] = useState(false);
+  const [imageScale, setImageScale] = useState(1);
+  const [isHoveringCanvas, setIsHoveringCanvas] = useState(false);
 
   // Initialize canvas size to match image natural size once image loads
   const handleImageLoad = () => {
     if (imgRef.current && canvasRef.current) {
       canvasRef.current.width = imgRef.current.naturalWidth;
       canvasRef.current.height = imgRef.current.naturalHeight;
+      updateImageScale();
       clearCanvas();
     }
   };
+
+  const updateImageScale = () => {
+    if (imgRef.current) {
+        setImageScale(imgRef.current.width / imgRef.current.naturalWidth);
+    }
+  };
+
+  // Update scale on resize
+  useEffect(() => {
+    window.addEventListener('resize', updateImageScale);
+    return () => window.removeEventListener('resize', updateImageScale);
+  }, []);
 
   const clearCanvas = () => {
     if (canvasRef.current) {
@@ -65,9 +81,25 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initial
     draw(e);
   };
 
+  const handleMouseMove = (e: React.MouseEvent) => {
+    // Update custom cursor position
+    if (activeTool === 'eraser' && cursorRef.current) {
+      cursorRef.current.style.transform = `translate(${e.clientX}px, ${e.clientY}px) translate(-50%, -50%)`;
+    }
+
+    if (isDrawing) {
+        draw(e);
+    }
+  };
+
   const draw = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawing || activeTool !== 'eraser' || !canvasRef.current) return;
-    e.preventDefault(); // Prevent scrolling on touch
+    if (!isDrawing && e.type !== 'mousedown' && e.type !== 'touchstart') return;
+    if (activeTool !== 'eraser' || !canvasRef.current) return;
+    
+    // For touch events we need to prevent scrolling
+    if (e.type.startsWith('touch')) {
+       // e.preventDefault(); // Moved to listener level if possible or keep here
+    }
 
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
@@ -79,10 +111,6 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initial
     ctx.lineJoin = 'round';
     ctx.lineWidth = brushSize;
     
-    // We draw with white color. The backend expects non-transparent pixels as mask.
-    // For visual feedback, we rely on the CSS opacity of the canvas or specific styling.
-    // Here we use a distinct color for the mask on the canvas, say, plain white.
-    // We can use CSS to make the canvas semi-transparent so the user sees underneath.
     ctx.strokeStyle = 'rgba(255, 255, 255, 1)'; 
     ctx.fillStyle = 'rgba(255, 255, 255, 1)';
     
@@ -178,9 +206,10 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initial
                   <canvas
                     ref={canvasRef}
                     onMouseDown={startDrawing}
-                    onMouseMove={draw}
+                    onMouseMove={handleMouseMove}
                     onMouseUp={stopDrawing}
-                    onMouseLeave={stopDrawing}
+                    onMouseLeave={() => { stopDrawing(); setIsHoveringCanvas(false); }}
+                    onMouseEnter={() => setIsHoveringCanvas(true)}
                     onTouchStart={startDrawing}
                     onTouchMove={draw}
                     onTouchEnd={stopDrawing}
@@ -191,15 +220,14 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initial
                   {/* Custom Cursor for Eraser */}
                   {activeTool === 'eraser' && !isProcessing && (
                       <div 
-                        className="fixed pointer-events-none rounded-full border-2 border-white shadow-[0_0_10px_rgba(0,0,0,0.5)] z-50 -translate-x-1/2 -translate-y-1/2 bg-white/20"
+                        ref={cursorRef}
+                        className="fixed pointer-events-none rounded-full border-2 border-white shadow-[0_0_10px_rgba(0,0,0,0.5)] z-50 bg-white/20 transition-opacity duration-75"
                         style={{ 
-                            width: brushSize * (containerRef.current?.getBoundingClientRect().width || 1000) / (imgRef.current?.naturalWidth || 1000), // Rough approximation for display cursor size
-                            height: brushSize * (containerRef.current?.getBoundingClientRect().width || 1000) / (imgRef.current?.naturalWidth || 1000),
-                            // We need a JS based cursor follower or simpler CSS cursor if scaling is tricky. 
-                            // For simplicity, let's just use the native cursor or a fixed CSS trick, but accurately sizing it is hard without listener.
-                            // Let's rely on the pointer events but we can attach a follower listener if we want perfection.
-                            // For now, removing this complexity to keep performance high, just using standard crosshair.
-                            display: 'none' 
+                            width: brushSize * imageScale,
+                            height: brushSize * imageScale,
+                            left: 0,
+                            top: 0,
+                            opacity: isHoveringCanvas ? 1 : 0
                         }} 
                       />
                   )}
@@ -256,7 +284,7 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initial
                           <div className="flex justify-center mt-4">
                               <div 
                                 className="rounded-full bg-white border border-zinc-600"
-                                style={{ width: brushSize / 2, height: brushSize / 2 }} // Preview scaled down
+                                style={{ width: (brushSize * imageScale) / 2, height: (brushSize * imageScale) / 2, maxHeight: 100, maxWidth: 100 }} // Preview scaled down
                               />
                           </div>
                       </div>
