@@ -115,6 +115,9 @@ export const generateImage = async (prompt: string, referenceImages?: (string | 
 
 export const eraseImage = async (imageUrl: string, maskBase64: string): Promise<GeneratedImage> => {
   try {
+    // Remove data URI prefix if present (e.g., "data:image/png;base64,")
+    const cleanMask = maskBase64.replace(/^data:image\/\w+;base64,/, "");
+
     const response = await fetch('http://localhost:8000/edit/erase', {
       method: 'POST',
       headers: {
@@ -122,7 +125,7 @@ export const eraseImage = async (imageUrl: string, maskBase64: string): Promise<
       },
       body: JSON.stringify({
         image: imageUrl,
-        mask: maskBase64,
+        mask: cleanMask,
         mask_type: "manual",
         preserve_alpha: true,
         sync: true
