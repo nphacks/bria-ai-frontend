@@ -112,3 +112,39 @@ export const generateImage = async (prompt: string, referenceImages?: (string | 
     throw error;
   }
 };
+
+export const eraseImage = async (imageUrl: string, maskBase64: string): Promise<GeneratedImage> => {
+  try {
+    const response = await fetch('http://localhost:8000/edit/erase', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        image: imageUrl,
+        mask: maskBase64,
+        mask_type: "manual",
+        preserve_alpha: true,
+        sync: true
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Backend error (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.image_url) {
+        // Fallback if the backend returns the raw object directly
+        if (data.result_url) return normalizeGeneratedImage({ image_url: data.result_url });
+        throw new Error('No image URL returned from backend');
+    }
+
+    return normalizeGeneratedImage(data);
+  } catch (error) {
+    console.error('Erase failed:', error);
+    throw error;
+  }
+};
