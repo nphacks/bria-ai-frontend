@@ -183,7 +183,11 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
                             </div>
                             <div>
                                 <h4 className="text-xs font-bold text-emerald-500 uppercase mb-2">Visual Details</h4>
-                                <p className="text-sm text-zinc-300 leading-relaxed">{activeCharacter.visualDetails}</p>
+                                <textarea 
+                                    value={activeCharacter.visualDetails}
+                                    onChange={(e) => onUpdateCharacter({...activeCharacter, visualDetails: e.target.value})}
+                                    className="text-sm text-zinc-300 leading-relaxed bg-transparent w-full h-32 border border-transparent hover:border-zinc-700 focus:border-emerald-500 rounded p-2 -ml-2 outline-none transition-colors scrollbar-thin scrollbar-thumb-zinc-700"
+                                />
                             </div>
                             <div>
                                 <h4 className="text-xs font-bold text-zinc-500 uppercase mb-2">Source Images</h4>
