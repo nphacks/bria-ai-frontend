@@ -17,6 +17,7 @@ interface SelectionMenu {
   x: number;
   y: number;
   text: string;
+  elementId?: string;
 }
 
 interface CharacterFormState {
@@ -35,6 +36,7 @@ interface ShotFormState {
   description: string;
   sceneNumber: string | number;
   shotNumber: string;
+  scriptElementId?: string;
 }
 
 const ART_STYLES: ArtStyle[] = [
@@ -72,6 +74,9 @@ export const Storyboard: React.FC<StoryboardProps> = ({
   // Selection Menu State
   const [selectionMenu, setSelectionMenu] = useState<SelectionMenu | null>(null);
   const scriptRef = useRef<HTMLDivElement>(null);
+  
+  // Refs for scrolling to shots
+  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Character Creation State (Separate from the List Modal)
   const [isCharacterModalOpen, setIsCharacterModalOpen] = useState(false);
@@ -96,7 +101,8 @@ export const Storyboard: React.FC<StoryboardProps> = ({
       cameraAngle: '',
       description: '',
       sceneNumber: '',
-      shotNumber: ''
+      shotNumber: '',
+      scriptElementId: undefined
   });
 
   // State for the currently generated but unsaved image
@@ -131,6 +137,17 @@ export const Storyboard: React.FC<StoryboardProps> = ({
     if (scriptRef.current && !scriptRef.current.contains(selection.anchorNode)) {
       return;
     }
+    
+    // Attempt to find the script element ID from the DOM
+    let elementId: string | undefined;
+    let currentNode: Node | null = selection.anchorNode;
+    while(currentNode && currentNode !== scriptRef.current) {
+        if (currentNode instanceof HTMLElement && currentNode.dataset.id) {
+            elementId = currentNode.dataset.id;
+            break;
+        }
+        currentNode = currentNode.parentNode;
+    }
 
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
@@ -138,8 +155,21 @@ export const Storyboard: React.FC<StoryboardProps> = ({
     setSelectionMenu({
       x: rect.left + rect.width / 2,
       y: rect.top,
-      text: text
+      text: text,
+      elementId: elementId
     });
+  };
+
+  const scrollToShot = (shotId: string) => {
+      const el = itemRefs.current[shotId];
+      if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Add a temporary flash effect
+          el.classList.add('ring-2', 'ring-emerald-500', 'ring-offset-2', 'ring-offset-zinc-900');
+          setTimeout(() => {
+              el.classList.remove('ring-2', 'ring-emerald-500', 'ring-offset-2', 'ring-offset-zinc-900');
+          }, 2000);
+      }
   };
 
   // --- Character Logic ---
@@ -215,7 +245,7 @@ export const Storyboard: React.FC<StoryboardProps> = ({
 
   // --- Storyboard / Shot Logic ---
 
-  const handlePrepareSceneShot = (text: string) => {
+  const handlePrepareSceneShot = (text: string, elementId?: string) => {
       // Set the selected text as the context, but start with empty description
       setActiveScriptContext(text);
       setShotForm({
@@ -224,7 +254,8 @@ export const Storyboard: React.FC<StoryboardProps> = ({
           cameraAngle: '',
           description: '', 
           sceneNumber: currentSceneNumber || '',
-          shotNumber: (storyboardItems.length + 1).toString()
+          shotNumber: (storyboardItems.length + 1).toString(),
+          scriptElementId: elementId
       });
       setSelectionMenu(null);
       window.getSelection()?.removeAllRanges();
@@ -265,7 +296,8 @@ export const Storyboard: React.FC<StoryboardProps> = ({
           description: shotForm.description,
           scriptContext: activeScriptContext,
           sceneNumber: typeof shotForm.sceneNumber === 'number' ? shotForm.sceneNumber : parseInt(shotForm.sceneNumber as string) || 0,
-          shotNumber: shotForm.shotNumber
+          shotNumber: shotForm.shotNumber,
+          scriptElementId: shotForm.scriptElementId
       };
 
       onUpdateStoryboard([...storyboardItems, newItem]);
@@ -275,6 +307,7 @@ export const Storyboard: React.FC<StoryboardProps> = ({
 
   const handleDeleteItem = (id: string) => {
       onUpdateStoryboard(storyboardItems.filter(item => item.id !== id));
+      delete itemRefs.current[id];
   };
 
   const handleMoveItem = (index: number, direction: 'up' | 'down') => {
@@ -290,6 +323,61 @@ export const Storyboard: React.FC<StoryboardProps> = ({
   const handleUpdateNote = (id: string, newNote: string) => {
       const newItems = storyboardItems.map(item => item.id === id ? { ...item, note: newNote } : item);
       onUpdateStoryboard(newItems);
+  };
+
+  // Helper to highlight text in the script
+  const renderScriptContent = (element: ScriptElement) => {
+      // Find items that reference this element
+      const items = storyboardItems.filter(
+          item => item.scriptElementId === element.id && item.scriptContext
+      );
+
+      if (items.length === 0) return element.content;
+
+      // Sort items by position of their context in the text
+      // Note: This naive approach matches the first occurrence. 
+      // Ideally we would store start indices, but we'll infer for now.
+      const sortedItems = [...items].sort((a, b) => {
+         return element.content.indexOf(a.scriptContext) - element.content.indexOf(b.scriptContext);
+      });
+
+      const parts = [];
+      let lastIndex = 0;
+
+      sortedItems.forEach((item, idx) => {
+          const start = element.content.indexOf(item.scriptContext, lastIndex);
+          if (start === -1) return; // Not found after lastIndex
+
+          // Text before highlight
+          if (start > lastIndex) {
+              parts.push(<span key={`text-${idx}`}>{element.content.substring(lastIndex, start)}</span>);
+          }
+
+          // Highlight
+          const end = start + item.scriptContext.length;
+          parts.push(
+              <span 
+                key={`highlight-${item.id}`} 
+                onClick={(e) => { e.stopPropagation(); scrollToShot(item.id); }}
+                className="bg-indigo-900/50 text-indigo-200 border-b border-indigo-500 cursor-pointer hover:bg-indigo-800/80 rounded px-0.5 relative group inline-block mx-0.5 transition-colors"
+                title={`Go to Shot ${item.shotNumber || '#'}`}
+              >
+                  {element.content.substring(start, end)}
+                  <span className="absolute -top-3 left-0 text-[8px] font-bold bg-indigo-500 text-white px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                      Shot {item.shotNumber}
+                  </span>
+              </span>
+          );
+
+          lastIndex = end;
+      });
+
+      // Remaining text
+      if (lastIndex < element.content.length) {
+          parts.push(<span key="text-end">{element.content.substring(lastIndex)}</span>);
+      }
+
+      return <>{parts}</>;
   };
 
   return (
@@ -375,7 +463,7 @@ export const Storyboard: React.FC<StoryboardProps> = ({
             <User className="w-3 h-3 text-emerald-400" /> Create character
           </button>
           <div className="w-px h-4 bg-zinc-600" />
-          <button onMouseDown={(e) => e.preventDefault()} onClick={() => handlePrepareSceneShot(selectionMenu.text)} className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-700 hover:text-white rounded-md transition-colors whitespace-nowrap">
+          <button onMouseDown={(e) => e.preventDefault()} onClick={() => handlePrepareSceneShot(selectionMenu.text, selectionMenu.elementId)} className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-700 hover:text-white rounded-md transition-colors whitespace-nowrap">
             <Film className="w-3 h-3 text-indigo-400" /> Create shot
           </button>
         </div>
@@ -415,20 +503,20 @@ export const Storyboard: React.FC<StoryboardProps> = ({
         >
           <div className="font-screenplay text-sm space-y-4">
              {sceneElements.map(el => (
-               <div key={el.id} className={
+               <div key={el.id} data-id={el.id} className={
                  el.type === 'SCENE_HEADING' ? 'font-bold uppercase mb-4 text-zinc-100' :
                  el.type === 'CHARACTER' ? 'mt-4 uppercase font-bold text-zinc-300 text-center' :
                  el.type === 'DIALOGUE' ? 'text-zinc-400 text-center px-8' :
                  el.type === 'PARENTHETICAL' ? 'text-zinc-500 text-center italic' :
                  'text-zinc-300'
                }>
-                 {el.content}
+                 {renderScriptContent(el)}
                </div>
              ))}
           </div>
           <div className="mt-12 p-4 rounded-lg bg-zinc-900/50 border border-zinc-800 text-zinc-500 text-xs flex items-center gap-3">
              <Sparkles className="w-4 h-4 text-emerald-600" />
-             <span>Highlight text to Create Character or Scene.</span>
+             <span>Highlight text to Create Character or Scene. Click highlight to view shot.</span>
           </div>
         </div>
 
@@ -580,7 +668,11 @@ export const Storyboard: React.FC<StoryboardProps> = ({
                     ) : (
                         <div className="space-y-6">
                             {storyboardItems.map((item, index) => (
-                                <div key={item.id} className="flex flex-col bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden group hover:border-zinc-700 transition-colors">
+                                <div 
+                                    key={item.id} 
+                                    ref={(el) => { itemRefs.current[item.id] = el; }}
+                                    className="flex flex-col bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden group hover:border-zinc-700 transition-all duration-500"
+                                >
                                     <div className="flex">
                                         {/* Handle / Index */}
                                         <div className="w-12 bg-zinc-900 border-r border-zinc-800 flex flex-col items-center justify-center gap-1 text-zinc-500 px-1">

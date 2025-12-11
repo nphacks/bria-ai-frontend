@@ -57,6 +57,7 @@ export interface StoryboardItem {
 
   description: string; // The visual description used for generation
   scriptContext: string; // The selected text from the script
+  scriptElementId?: string; // ID of the specific script element line
 }
 
 export interface ProjectData {
