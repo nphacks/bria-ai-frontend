@@ -212,6 +212,13 @@ const App: React.FC = () => {
       return [];
   };
 
+  const getAllProjectImages = (): GeneratedImage[] => {
+      const charImages = savedCharacters.flatMap(c => c.generatedPortraits);
+      const storyboardImages = Object.values(storyboards).flatMap(list => list.map(item => item.image));
+      // Removing duplicates by URL might be nice, but simple concat is fast and sufficient
+      return [...charImages, ...storyboardImages];
+  };
+
   return (
     <div className="h-screen bg-zinc-950 flex flex-col overflow-hidden">
       <Header 
@@ -242,6 +249,7 @@ const App: React.FC = () => {
             image={selectedImageForEdit}
             onBack={handleBackFromEditStudio}
             onSave={handleSaveEditedImage}
+            projectImages={getAllProjectImages()}
           />
         )}
       </main>

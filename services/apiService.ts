@@ -222,3 +222,46 @@ export const removeBackground = async (imageUrl: string): Promise<GeneratedImage
     throw error;
   }
 };
+
+export const replaceBackground = async (imageUrl: string, prompt?: string, refImages?: string[]): Promise<GeneratedImage> => {
+  try {
+    const body: any = {
+      image: imageUrl,
+      mode: 'high_control',
+      sync: true
+    };
+
+    if (prompt && prompt.trim().length > 0) {
+      body.prompt = prompt;
+    } else if (refImages && refImages.length > 0) {
+      body.ref_images = refImages;
+    } else {
+      throw new Error("Either a prompt or reference images must be provided for background replacement.");
+    }
+
+    const response = await fetch('http://localhost:8000/edit/replace_bg/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Backend error (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.image_url) {
+        if (data.result_url) return normalizeGeneratedImage({ image_url: data.result_url });
+        throw new Error('No image URL returned from backend');
+    }
+
+    return normalizeGeneratedImage(data);
+  } catch (error) {
+    console.error('Replace background failed:', error);
+    throw error;
+  }
+};
