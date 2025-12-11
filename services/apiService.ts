@@ -223,20 +223,10 @@ export const removeBackground = async (imageUrl: string): Promise<GeneratedImage
   }
 };
 
-export const replaceBackground = async (imageUrl: string, prompt?: string, refImages?: string[]): Promise<GeneratedImage> => {
+export const replaceBackground = async (imageUrl: string, prompt: string): Promise<GeneratedImage> => {
   try {
-    const body: any = {
-      image: imageUrl,
-      mode: 'high_control',
-      sync: true
-    };
-
-    if (prompt && prompt.trim().length > 0) {
-      body.prompt = prompt;
-    } else if (refImages && refImages.length > 0) {
-      body.ref_images = refImages;
-    } else {
-      throw new Error("Either a prompt or reference images must be provided for background replacement.");
+    if (!prompt || !prompt.trim()) {
+      throw new Error("Prompt is required for background replacement.");
     }
 
     const response = await fetch('http://localhost:8000/edit/replace_bg/', {
@@ -244,7 +234,12 @@ export const replaceBackground = async (imageUrl: string, prompt?: string, refIm
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        image: imageUrl,
+        mode: 'high_control',
+        prompt: prompt,
+        sync: true
+      }),
     });
 
     if (!response.ok) {

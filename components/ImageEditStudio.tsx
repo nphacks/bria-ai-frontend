@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Wand2, Eraser, Move, Undo2, Download, RefreshCw, Layers, Check, X, Sparkles, ImagePlus, Upload } from 'lucide-react';
+import { ArrowLeft, Wand2, Eraser, Move, Undo2, Download, RefreshCw, Layers, Check, X, Sparkles, ImagePlus } from 'lucide-react';
 import { GeneratedImage } from '../types';
 import { eraseImage, generativeFill, removeBackground, replaceBackground } from '../services/apiService';
 
@@ -7,14 +7,12 @@ interface ImageEditStudioProps {
   image: GeneratedImage | null;
   onBack: () => void;
   onSave: (original: GeneratedImage, newImage: GeneratedImage) => void;
-  projectImages?: GeneratedImage[];
 }
 
 export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ 
     image: initialImage, 
     onBack, 
-    onSave,
-    projectImages = []
+    onSave
 }) => {
   const [currentImage, setCurrentImage] = useState<GeneratedImage | null>(initialImage);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -23,9 +21,7 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
   const [genFillPrompt, setGenFillPrompt] = useState('');
   
   // Replace BG State
-  const [replaceBgMode, setReplaceBgMode] = useState<'prompt' | 'reference'>('prompt');
   const [replaceBgPrompt, setReplaceBgPrompt] = useState('');
-  const [replaceBgReferences, setReplaceBgReferences] = useState<string[]>([]);
   
   // Canvas & Image Refs
   const containerRef = useRef<HTMLDivElement>(null);
@@ -175,21 +171,12 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
         } else if (activeTool === 'remove_bg') {
             result = await removeBackground(currentImage.image_url);
         } else if (activeTool === 'replace_bg') {
-            if (replaceBgMode === 'prompt') {
-                if (!replaceBgPrompt.trim()) {
-                    alert("Please enter a prompt.");
-                    setIsProcessing(false);
-                    return;
-                }
-                result = await replaceBackground(currentImage.image_url, replaceBgPrompt);
-            } else {
-                if (replaceBgReferences.length === 0) {
-                    alert("Please select at least one reference image.");
-                    setIsProcessing(false);
-                    return;
-                }
-                result = await replaceBackground(currentImage.image_url, undefined, replaceBgReferences);
+            if (!replaceBgPrompt.trim()) {
+                alert("Please enter a prompt.");
+                setIsProcessing(false);
+                return;
             }
+            result = await replaceBackground(currentImage.image_url, replaceBgPrompt);
         } else {
             return;
         }
@@ -200,7 +187,6 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
         setActiveTool('move');
         setGenFillPrompt('');
         setReplaceBgPrompt('');
-        setReplaceBgReferences([]);
     } catch (error) {
         console.error("Operation failed", error);
         alert("Failed to process image. See console for details.");
@@ -218,26 +204,6 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
   const handleDiscard = () => {
       setCurrentImage(initialImage);
       clearCanvas();
-  };
-
-  const handleUploadReference = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = e.target.files;
-      if (files) {
-        Array.from(files).forEach((file: any) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            const base64 = reader.result as string;
-            setReplaceBgReferences(prev => [...prev, base64]);
-          };
-          reader.readAsDataURL(file);
-        });
-      }
-  };
-
-  const toggleBgReference = (url: string) => {
-      setReplaceBgReferences(prev => 
-          prev.includes(url) ? prev.filter(u => u !== url) : [...prev, url]
-      );
   };
 
   if (!initialImage) return null;
@@ -470,91 +436,22 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
                 {/* Replace BG Controls */}
                 {activeTool === 'replace_bg' && !hasUnsavedChanges && (
                     <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-6 flex flex-col h-full">
-                        {/* Mode Toggle */}
-                        <div className="flex bg-zinc-800 rounded-lg p-1 border border-zinc-700">
-                            <button 
-                                onClick={() => setReplaceBgMode('prompt')}
-                                className={`flex-1 py-1.5 text-xs font-medium rounded transition-all ${replaceBgMode === 'prompt' ? 'bg-zinc-600 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}
-                            >
-                                Text Prompt
-                            </button>
-                            <button 
-                                onClick={() => setReplaceBgMode('reference')}
-                                className={`flex-1 py-1.5 text-xs font-medium rounded transition-all ${replaceBgMode === 'reference' ? 'bg-zinc-600 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}
-                            >
-                                Reference Image
-                            </button>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs font-bold text-zinc-400 uppercase mb-2 block">New Background Prompt</label>
+                                <textarea 
+                                    value={replaceBgPrompt}
+                                    onChange={(e) => setReplaceBgPrompt(e.target.value)}
+                                    placeholder="e.g. A futuristic city skyline at night..."
+                                    className="w-full h-32 bg-zinc-950 border border-zinc-700 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none resize-none"
+                                />
+                            </div>
                         </div>
-
-                        {replaceBgMode === 'prompt' ? (
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="text-xs font-bold text-zinc-400 uppercase mb-2 block">New Background Prompt</label>
-                                    <textarea 
-                                        value={replaceBgPrompt}
-                                        onChange={(e) => setReplaceBgPrompt(e.target.value)}
-                                        placeholder="e.g. A futuristic city skyline at night..."
-                                        className="w-full h-32 bg-zinc-950 border border-zinc-700 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none resize-none"
-                                    />
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-                                <label className="text-xs font-bold text-zinc-400 uppercase mb-2 block">Reference Images</label>
-                                
-                                {/* Selected References */}
-                                {replaceBgReferences.length > 0 && (
-                                    <div className="flex gap-2 flex-wrap mb-4 bg-zinc-950 p-2 rounded-lg border border-zinc-800">
-                                        {replaceBgReferences.map((url, i) => (
-                                            <div key={i} className="relative w-12 h-12 rounded overflow-hidden border border-zinc-600">
-                                                <img src={url} className="w-full h-full object-cover" />
-                                                <button 
-                                                    onClick={() => toggleBgReference(url)}
-                                                    className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 flex items-center justify-center text-white"
-                                                >
-                                                    <X className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {/* Upload */}
-                                <div className="mb-4">
-                                    <label className="flex items-center justify-center gap-2 w-full py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 border-dashed rounded-lg text-xs text-zinc-400 cursor-pointer transition-colors">
-                                        <Upload className="w-3 h-3" /> Upload Image
-                                        <input type="file" accept="image/*" className="hidden" onChange={handleUploadReference} multiple />
-                                    </label>
-                                </div>
-
-                                {/* Project Gallery Grid */}
-                                <div className="flex-1 overflow-y-auto custom-scrollbar border-t border-zinc-800 pt-2">
-                                    <h5 className="text-[10px] font-bold text-zinc-500 uppercase mb-2">Project Assets</h5>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {projectImages.length > 0 ? projectImages.map((img, idx) => {
-                                            const isSelected = replaceBgReferences.includes(img.image_url);
-                                            return (
-                                                <div 
-                                                    key={idx}
-                                                    onClick={() => toggleBgReference(img.image_url)}
-                                                    className={`relative aspect-square rounded overflow-hidden cursor-pointer border-2 transition-all ${isSelected ? 'border-emerald-500' : 'border-transparent hover:border-zinc-600'}`}
-                                                >
-                                                    <img src={img.image_url} className="w-full h-full object-cover" loading="lazy" />
-                                                    {isSelected && <div className="absolute top-1 right-1 w-2 h-2 bg-emerald-500 rounded-full" />}
-                                                </div>
-                                            );
-                                        }) : (
-                                            <div className="col-span-3 text-center py-4 text-xs text-zinc-600">No generated images yet.</div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
 
                         <div className="mt-4 pt-4 border-t border-zinc-800">
                              <button 
                                 onClick={handleApplyTool}
-                                disabled={isProcessing || (replaceBgMode === 'prompt' && !replaceBgPrompt.trim()) || (replaceBgMode === 'reference' && replaceBgReferences.length === 0)}
+                                disabled={isProcessing || !replaceBgPrompt.trim()}
                                 className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20"
                             >
                                 <ImagePlus className="w-4 h-4" />
