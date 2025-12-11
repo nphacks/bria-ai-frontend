@@ -167,10 +167,6 @@ const App: React.FC = () => {
     setSavedCharacters(prev => prev.map(c => c.id === updatedChar.id ? updatedChar : c));
   };
 
-  const handleImportCharacters = (newChars: CharacterProfile[]) => {
-    setSavedCharacters(newChars);
-  };
-
   const handleAddCharacter = (newChar: CharacterProfile) => {
     setSavedCharacters(prev => {
         const existingIndex = prev.findIndex(c => c.name.toLowerCase() === newChar.name.toLowerCase());
@@ -249,7 +245,6 @@ const App: React.FC = () => {
             image={selectedImageForEdit}
             onBack={handleBackFromEditStudio}
             onSave={handleSaveEditedImage}
-            projectImages={getAllProjectImages()}
           />
         )}
       </main>
@@ -259,7 +254,6 @@ const App: React.FC = () => {
         onClose={() => setIsCharacterListOpen(false)}
         characters={savedCharacters}
         onUpdateCharacter={handleUpdateCharacter}
-        onImportCharacters={handleImportCharacters}
         onNavigateToEditStudio={handleNavigateToEditStudio}
       />
     </div>

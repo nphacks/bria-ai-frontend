@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { CharacterProfile, ArtStyle, GeneratedImage } from '../types';
-import { Users, Download, Upload, X, ChevronLeft, ImageIcon, Sparkles, Loader2, Wand2, CheckCircle2, User, Edit2 } from 'lucide-react';
-import { generateImage, normalizeGeneratedImage } from '../services/apiService';
+import { Users, X, ChevronLeft, ImageIcon, Sparkles, Loader2, Wand2, CheckCircle2, User, Edit2 } from 'lucide-react';
+import { generateImage } from '../services/apiService';
 
 interface CharacterListModalProps {
   isOpen: boolean;
   onClose: () => void;
   characters: CharacterProfile[];
   onUpdateCharacter: (character: CharacterProfile) => void;
-  onImportCharacters: (characters: CharacterProfile[]) => void;
   onNavigateToEditStudio: (image: GeneratedImage) => void;
 }
 
@@ -25,7 +24,6 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
   onClose,
   characters,
   onUpdateCharacter,
-  onImportCharacters,
   onNavigateToEditStudio
 }) => {
   const [activeCharacterId, setActiveCharacterId] = useState<string | null>(null);
@@ -45,48 +43,6 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
   }, [activeCharacterId]);
 
   if (!isOpen) return null;
-
-  const handleDownloadCharacters = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(characters));
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", "characters.json");
-    document.body.appendChild(downloadAnchorNode);
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
-  };
-
-  const handleUploadCharacters = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const loaded = JSON.parse(event.target?.result as string);
-          if (Array.isArray(loaded)) {
-            const valid = loaded.every((c: any) => c.name && Array.isArray(c.generatedPortraits));
-            if (valid) {
-                const existingIds = new Set(characters.map(p => p.id));
-                const newChars = loaded.filter((c: CharacterProfile) => !existingIds.has(c.id));
-                
-                // Normalize imported characters to ensure flat image structure
-                const normalizedNewChars = newChars.map((c: any) => ({
-                    ...c,
-                    generatedPortraits: c.generatedPortraits.map(normalizeGeneratedImage)
-                }));
-
-                onImportCharacters([...characters, ...normalizedNewChars]);
-            } else {
-                alert('JSON format does not match expected CharacterProfile structure.');
-            }
-          }
-        } catch (err) {
-          alert('Invalid JSON file');
-        }
-      };
-      reader.readAsText(file);
-    }
-  };
 
   const toggleReferenceImage = (url: string) => {
     setSelectedReferenceUrls(prev => {
@@ -144,13 +100,6 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
                 <span className="text-zinc-500 text-sm bg-zinc-800 px-2 py-0.5 rounded-full">{characters.length}</span>
             </div>
             <div className="flex items-center gap-4">
-                 <button onClick={handleDownloadCharacters} title="Export Library" className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-sm text-zinc-300">
-                    <Download className="w-4 h-4" /> Export
-                 </button>
-                 <label title="Import Library" className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-sm text-zinc-300 cursor-pointer">
-                    <Upload className="w-4 h-4" /> Import
-                    <input type="file" accept=".json" onChange={handleUploadCharacters} className="hidden" />
-                 </label>
                 <button onClick={() => { onClose(); setActiveCharacterId(null); }} className="p-2 hover:bg-zinc-800 rounded-full">
                     <X className="w-6 h-6 text-zinc-400" />
                 </button>
