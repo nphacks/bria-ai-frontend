@@ -1,3 +1,4 @@
+
 export type ScriptElementType = 
   | 'SCENE_HEADING'
   | 'ACTION'
@@ -36,8 +37,18 @@ export interface CharacterProfile {
   generatedPortraits: GeneratedImage[]; // Array of result image objects
 }
 
+export interface StoryboardItem {
+  id: string;
+  image: GeneratedImage;
+  note: string;
+  shotType?: string;
+  shotComposition?: string;
+  description: string; // The visual description used for generation
+  scriptContext: string; // The selected text from the script
+}
+
 export interface ProjectData {
   screenplay: ScriptElement[];
   characters: CharacterProfile[];
-  storyboards: Record<string, GeneratedImage>; // Key is the SCENE_HEADING element ID
+  storyboards: Record<string, StoryboardItem[]>; // Key is the SCENE_HEADING element ID
 }

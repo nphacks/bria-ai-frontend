@@ -3,7 +3,7 @@ import { ScreenplayEditor } from './components/ScreenplayEditor';
 import { Header } from './components/Header';
 import { Storyboard } from './components/Storyboard';
 import { CharacterListModal } from './components/CharacterListModal';
-import { ScriptElement, CharacterProfile, GeneratedImage, ProjectData } from './types';
+import { ScriptElement, CharacterProfile, StoryboardItem, ProjectData } from './types';
 import { normalizeGeneratedImage } from './services/apiService';
 
 type ViewState = 'EDITOR' | 'STORYBOARD';
@@ -31,7 +31,8 @@ const App: React.FC = () => {
   // Unified Project State
   const [elements, setElements] = useState<ScriptElement[]>(DEFAULT_SCRIPT);
   const [savedCharacters, setSavedCharacters] = useState<CharacterProfile[]>([]);
-  const [storyboards, setStoryboards] = useState<Record<string, GeneratedImage>>({});
+  // storyboards is now Record<SceneID, StoryboardItem[]>
+  const [storyboards, setStoryboards] = useState<Record<string, StoryboardItem[]>>({});
 
   const [selectedScene, setSelectedScene] = useState<ScriptElement[]>([]);
   const [isCharacterListOpen, setIsCharacterListOpen] = useState(false);
@@ -81,10 +82,26 @@ const App: React.FC = () => {
                 setSavedCharacters(cleanCharacters);
 
                 // Normalize storyboards data structure
-                const cleanStoryboards: Record<string, GeneratedImage> = {};
+                const cleanStoryboards: Record<string, StoryboardItem[]> = {};
                 if (data.storyboards) {
-                    Object.entries(data.storyboards).forEach(([k, v]) => {
-                        cleanStoryboards[k] = normalizeGeneratedImage(v);
+                    Object.entries(data.storyboards).forEach(([k, v]: [string, any]) => {
+                        // Handle legacy format where value was just GeneratedImage
+                        if (!Array.isArray(v) && v.image_url) {
+                             const normImg = normalizeGeneratedImage(v);
+                             cleanStoryboards[k] = [{
+                                 id: Date.now().toString(),
+                                 image: normImg,
+                                 note: '',
+                                 description: 'Imported shot',
+                                 scriptContext: ''
+                             }];
+                        } else if (Array.isArray(v)) {
+                             cleanStoryboards[k] = v.map((item: any) => ({
+                                 ...item,
+                                 image: normalizeGeneratedImage(item.image),
+                                 scriptContext: item.scriptContext || '' // Ensure backward compat
+                             }));
+                        }
                     });
                 }
                 setStoryboards(cleanStoryboards);
@@ -133,23 +150,21 @@ const App: React.FC = () => {
   };
 
   // --- Storyboard Management ---
-  const handleUpdateStoryboard = (image: GeneratedImage) => {
-      // The selected scene's ID is used as the key. 
-      // Assuming selectedScene[0] is always the Scene Heading or the primary element linking the scene.
+  const handleUpdateStoryboardItems = (items: StoryboardItem[]) => {
       if (selectedScene.length > 0) {
           const sceneId = selectedScene[0].id;
           setStoryboards(prev => ({
               ...prev,
-              [sceneId]: image
+              [sceneId]: items
           }));
       }
   };
 
-  const getActiveStoryboardImage = () => {
+  const getActiveStoryboardItems = (): StoryboardItem[] => {
       if (selectedScene.length > 0) {
-          return storyboards[selectedScene[0].id];
+          return storyboards[selectedScene[0].id] || [];
       }
-      return undefined;
+      return [];
   };
 
   return (
@@ -173,8 +188,8 @@ const App: React.FC = () => {
             savedCharacters={savedCharacters}
             onAddCharacter={handleAddCharacter}
             onOpenCharacterList={() => setIsCharacterListOpen(true)}
-            existingStoryboard={getActiveStoryboardImage()}
-            onUpdateStoryboard={handleUpdateStoryboard}
+            storyboardItems={getActiveStoryboardItems()}
+            onUpdateStoryboard={handleUpdateStoryboardItems}
           />
         )}
       </main>

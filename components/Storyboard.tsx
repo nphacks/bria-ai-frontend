@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ScriptElement, CharacterProfile, ArtStyle, GeneratedImage } from '../types';
-import { ArrowLeft, Loader2, Image as ImageIcon, Clapperboard, User, Film, Sparkles, X, Plus, Users, Save } from 'lucide-react';
+import { ScriptElement, CharacterProfile, ArtStyle, GeneratedImage, StoryboardItem } from '../types';
+import { ArrowLeft, Loader2, Image as ImageIcon, Clapperboard, User, Film, Sparkles, X, Plus, Users, Save, Trash2, ArrowUp, ArrowDown, Edit3, Camera, Quote } from 'lucide-react';
 import { generateImage } from '../services/apiService';
 
 interface StoryboardProps {
@@ -9,8 +9,8 @@ interface StoryboardProps {
   savedCharacters: CharacterProfile[];
   onAddCharacter: (char: CharacterProfile) => void;
   onOpenCharacterList: () => void;
-  existingStoryboard: GeneratedImage | undefined;
-  onUpdateStoryboard: (image: GeneratedImage) => void;
+  storyboardItems: StoryboardItem[];
+  onUpdateStoryboard: (items: StoryboardItem[]) => void;
 }
 
 interface SelectionMenu {
@@ -28,6 +28,12 @@ interface CharacterFormState {
   currentPreview: GeneratedImage | null;
 }
 
+interface ShotFormState {
+  shotType: string;
+  shotComposition: string;
+  description: string;
+}
+
 const ART_STYLES: ArtStyle[] = [
   'Cinematic/Digital',
   'Pencil Sketch',
@@ -36,20 +42,25 @@ const ART_STYLES: ArtStyle[] = [
   'Ink Illustration'
 ];
 
+const SHOT_TYPES = [
+    'Extreme Wide Shot', 'Wide Shot', 'Full Shot', 'Medium Shot', 'Close Up', 'Extreme Close Up'
+];
+
+const SHOT_COMPOSITIONS = [
+    'Center Framed', 'Rule of Thirds', 'Symmetrical', 'Low Angle', 'High Angle', 'Overhead', 'Dutch Angle'
+];
+
 export const Storyboard: React.FC<StoryboardProps> = ({ 
   sceneElements, 
   onBack, 
   savedCharacters,
   onAddCharacter,
   onOpenCharacterList,
-  existingStoryboard,
+  storyboardItems,
   onUpdateStoryboard
 }) => {
-  // Main Visualization State
-  const [generatedScene, setGeneratedScene] = useState<GeneratedImage | null>(existingStoryboard || null);
+  // --- State ---
   const [isLoading, setIsLoading] = useState(false);
-  const [generationType, setGenerationType] = useState<'SCENE' | 'CHARACTER' | 'FULL_SCENE'>('FULL_SCENE');
-  const [promptUsed, setPromptUsed] = useState<string>('');
   
   // Selection Menu State
   const [selectionMenu, setSelectionMenu] = useState<SelectionMenu | null>(null);
@@ -58,6 +69,9 @@ export const Storyboard: React.FC<StoryboardProps> = ({
   // Character Creation State (Separate from the List Modal)
   const [isCharacterModalOpen, setIsCharacterModalOpen] = useState(false);
   
+  // Context for the shot being created
+  const [activeScriptContext, setActiveScriptContext] = useState<string | null>(null);
+
   // Character Form State
   const [charForm, setCharForm] = useState<CharacterFormState>({
     name: '',
@@ -68,12 +82,16 @@ export const Storyboard: React.FC<StoryboardProps> = ({
     currentPreview: null
   });
 
-  // Sync state with prop if prop changes (e.g. navigation or update)
-  useEffect(() => {
-    if (existingStoryboard) {
-        setGeneratedScene(existingStoryboard);
-    }
-  }, [existingStoryboard]);
+  // New Shot Form State
+  const [shotForm, setShotForm] = useState<ShotFormState>({
+      shotType: '',
+      shotComposition: '',
+      description: ''
+  });
+
+  // State for the currently generated but unsaved image
+  const [generatedPreview, setGeneratedPreview] = useState<GeneratedImage | null>(null);
+  const [previewNote, setPreviewNote] = useState('');
 
   // Handle outside clicks to close menu
   useEffect(() => {
@@ -88,13 +106,6 @@ export const Storyboard: React.FC<StoryboardProps> = ({
 
   const heading = sceneElements.find(el => el.type === 'SCENE_HEADING')?.content || 'Unknown Scene';
   
-  const constructFullScenePrompt = () => {
-    return sceneElements
-      .filter(el => el.type === 'ACTION' || el.type === 'SCENE_HEADING')
-      .map(el => el.content)
-      .join(' ');
-  };
-
   const handleTextSelection = () => {
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed) {
@@ -190,37 +201,76 @@ export const Storyboard: React.FC<StoryboardProps> = ({
     }
   };
 
-  // --- Main Generate Handler ---
-  
-  const handleGenerateMain = async (text: string, type: 'SCENE' | 'CHARACTER' | 'FULL_SCENE') => {
+  // --- Storyboard / Shot Logic ---
+
+  const handlePrepareSceneShot = (text: string) => {
+      // Set the selected text as the context, but start with empty description
+      setActiveScriptContext(text);
+      setShotForm({
+          shotType: '',
+          shotComposition: '',
+          description: '' // User must fill this
+      });
+      setSelectionMenu(null);
+      window.getSelection()?.removeAllRanges();
+  };
+
+  const handleGenerateShot = async () => {
     setIsLoading(true);
-    setSelectionMenu(null);
-    setGenerationType(type);
-    setPromptUsed(text);
-    window.getSelection()?.removeAllRanges();
-
     try {
-      let finalPrompt = text;
-      if (type === 'SCENE') {
-        finalPrompt = `Cinematic movie scene, wide angle, 8k resolution, detailed environment: ${text}`;
-      } else if (type === 'CHARACTER') {
-        finalPrompt = `Character Portrait, detailed, 8k: ${text}`;
-      } else {
-         finalPrompt = `Cinematic storyboard frame, movie still, 8k: ${text}`;
-      }
-      const result = await generateImage(finalPrompt);
-      setGeneratedScene(result);
-      
-      // If we generated a scene or full scene, save it as the storyboard for this scene
-      if (type === 'SCENE' || type === 'FULL_SCENE') {
-          onUpdateStoryboard(result);
-      }
+        let finalPrompt = `Cinematic movie scene. 8k resolution. `;
+        if (shotForm.shotType) finalPrompt += `Shot Type: ${shotForm.shotType}. `;
+        if (shotForm.shotComposition) finalPrompt += `Composition: ${shotForm.shotComposition}. `;
+        
+        // Use the manual description for the prompt, NOT the context
+        finalPrompt += `Description: ${shotForm.description}`;
 
+        const result = await generateImage(finalPrompt);
+        setGeneratedPreview(result);
+        setPreviewNote('');
     } catch (error) {
-      console.error("Failed to generate", error);
+        console.error("Failed to generate shot", error);
+        alert("Failed to generate shot");
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
+  };
+
+  const handleSaveShot = () => {
+      if (!generatedPreview || !activeScriptContext) return;
+      
+      const newItem: StoryboardItem = {
+          id: Date.now().toString(),
+          image: generatedPreview,
+          note: previewNote,
+          shotType: shotForm.shotType,
+          shotComposition: shotForm.shotComposition,
+          description: shotForm.description,
+          scriptContext: activeScriptContext
+      };
+
+      onUpdateStoryboard([...storyboardItems, newItem]);
+      setGeneratedPreview(null);
+      setActiveScriptContext(null); // Close the form after saving
+  };
+
+  const handleDeleteItem = (id: string) => {
+      onUpdateStoryboard(storyboardItems.filter(item => item.id !== id));
+  };
+
+  const handleMoveItem = (index: number, direction: 'up' | 'down') => {
+      const newItems = [...storyboardItems];
+      if (direction === 'up' && index > 0) {
+          [newItems[index], newItems[index - 1]] = [newItems[index - 1], newItems[index]];
+      } else if (direction === 'down' && index < newItems.length - 1) {
+          [newItems[index], newItems[index + 1]] = [newItems[index + 1], newItems[index]];
+      }
+      onUpdateStoryboard(newItems);
+  };
+
+  const handleUpdateNote = (id: string, newNote: string) => {
+      const newItems = storyboardItems.map(item => item.id === id ? { ...item, note: newNote } : item);
+      onUpdateStoryboard(newItems);
   };
 
   return (
@@ -230,8 +280,7 @@ export const Storyboard: React.FC<StoryboardProps> = ({
       {isCharacterModalOpen && (
         <div className="fixed inset-0 z-[50] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col md:flex-row">
-            
-            {/* Form Side */}
+            {/* ... Character Form UI (same as before) ... */}
             <div className="p-6 md:w-1/2 space-y-4 border-r border-zinc-800">
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-xl font-bold flex items-center gap-2">
@@ -239,60 +288,32 @@ export const Storyboard: React.FC<StoryboardProps> = ({
                   Create Character
                 </h3>
               </div>
-
+              {/* Fields */}
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-zinc-400 uppercase">Character Name</label>
-                <input 
-                  type="text" 
-                  value={charForm.name}
-                  onChange={e => setCharForm({...charForm, name: e.target.value})}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-white focus:ring-1 focus:ring-emerald-500 outline-none"
-                  placeholder="e.g. Willy Wonka"
-                />
+                <input type="text" value={charForm.name} onChange={e => setCharForm({...charForm, name: e.target.value})} className="w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-white focus:ring-1 focus:ring-emerald-500 outline-none" placeholder="e.g. Willy Wonka" />
               </div>
-
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-zinc-400 uppercase">Description</label>
-                <textarea 
-                  value={charForm.description}
-                  onChange={e => setCharForm({...charForm, description: e.target.value})}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-sm text-zinc-300 focus:ring-1 focus:ring-emerald-500 outline-none h-20"
-                />
+                <textarea value={charForm.description} onChange={e => setCharForm({...charForm, description: e.target.value})} className="w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-sm text-zinc-300 focus:ring-1 focus:ring-emerald-500 outline-none h-20" />
               </div>
-
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-zinc-400 uppercase">Visual Details (Looks, Accessories, Colors)</label>
-                <textarea 
-                  value={charForm.visualDetails}
-                  onChange={e => setCharForm({...charForm, visualDetails: e.target.value})}
-                  placeholder="Green waistcoat, colorful scarf, top hat, crazy eyes..."
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-sm text-zinc-300 focus:ring-1 focus:ring-emerald-500 outline-none h-20"
-                />
+                <label className="text-xs font-semibold text-zinc-400 uppercase">Visual Details</label>
+                <textarea value={charForm.visualDetails} onChange={e => setCharForm({...charForm, visualDetails: e.target.value})} placeholder="Green waistcoat..." className="w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-sm text-zinc-300 focus:ring-1 focus:ring-emerald-500 outline-none h-20" />
               </div>
-
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-zinc-400 uppercase">Art Style</label>
-                <select 
-                  value={charForm.artStyle}
-                  onChange={e => setCharForm({...charForm, artStyle: e.target.value as ArtStyle})}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-sm text-white outline-none"
-                >
+                <select value={charForm.artStyle} onChange={e => setCharForm({...charForm, artStyle: e.target.value as ArtStyle})} className="w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-sm text-white outline-none">
                   {ART_STYLES.map(style => <option key={style} value={style}>{style}</option>)}
                 </select>
               </div>
-
-              <div className="space-y-1">
+               <div className="space-y-1">
                 <label className="text-xs font-semibold text-zinc-400 uppercase">Reference Images</label>
                 <div className="flex gap-2 items-center overflow-x-auto pb-2">
                    {charForm.referenceImages?.map((img, idx) => (
                      <div key={idx} className="relative w-12 h-12 flex-shrink-0 rounded overflow-hidden border border-zinc-700">
                         <img src={img} className="w-full h-full object-cover" />
-                        <button 
-                          onClick={() => setCharForm(prev => ({...prev, referenceImages: prev.referenceImages?.filter((_, i) => i !== idx)}))}
-                          className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 flex items-center justify-center text-red-500"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
+                        <button onClick={() => setCharForm(prev => ({...prev, referenceImages: prev.referenceImages?.filter((_, i) => i !== idx)}))} className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 flex items-center justify-center text-red-500"><X className="w-4 h-4" /></button>
                      </div>
                    ))}
                    <label className="w-12 h-12 flex-shrink-0 rounded border border-dashed border-zinc-600 flex items-center justify-center hover:bg-zinc-800 cursor-pointer">
@@ -301,40 +322,24 @@ export const Storyboard: React.FC<StoryboardProps> = ({
                    </label>
                 </div>
               </div>
-              
               <div className="pt-4 flex gap-3">
-                 <button 
-                   onClick={handleGenerateCharacterPreview}
-                   disabled={isLoading || !charForm.name}
-                   className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2 rounded font-medium flex items-center justify-center gap-2"
-                 >
-                   {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                   Generate Preview
+                 <button onClick={handleGenerateCharacterPreview} disabled={isLoading || !charForm.name} className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2 rounded font-medium flex items-center justify-center gap-2">
+                   {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} Generate Preview
                  </button>
                  <button onClick={() => setIsCharacterModalOpen(false)} className="px-4 py-2 border border-zinc-600 rounded hover:bg-zinc-800">Cancel</button>
               </div>
             </div>
-
             {/* Preview Side */}
             <div className="p-6 md:w-1/2 bg-black flex flex-col items-center justify-center relative border-l border-zinc-800 min-h-[300px]">
               {charForm.currentPreview ? (
                 <>
                   <img src={charForm.currentPreview.image_url} alt="Preview" className="w-full h-full object-contain max-h-[400px] rounded" />
                   <div className="absolute bottom-6 flex gap-2">
-                     <button 
-                        onClick={handleSaveCharacter}
-                        className="bg-white text-black px-6 py-2 rounded-full font-bold shadow-lg hover:scale-105 transition-transform flex items-center gap-2"
-                     >
-                       <Save className="w-4 h-4" />
-                       Save to Gallery
-                     </button>
+                     <button onClick={handleSaveCharacter} className="bg-white text-black px-6 py-2 rounded-full font-bold shadow-lg hover:scale-105 transition-transform flex items-center gap-2"><Save className="w-4 h-4" /> Save to Gallery</button>
                   </div>
                 </>
               ) : (
-                <div className="text-zinc-600 flex flex-col items-center">
-                  <User className="w-16 h-16 mb-2 opacity-20" />
-                  <p className="text-sm">Preview will appear here</p>
-                </div>
+                <div className="text-zinc-600 flex flex-col items-center"><User className="w-16 h-16 mb-2 opacity-20" /><p className="text-sm">Preview will appear here</p></div>
               )}
             </div>
           </div>
@@ -345,59 +350,32 @@ export const Storyboard: React.FC<StoryboardProps> = ({
       {selectionMenu && (
         <div 
           className="fixed z-50 flex items-center gap-1 p-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-2xl animate-in fade-in zoom-in-95 duration-200"
-          style={{ 
-            left: selectionMenu.x, 
-            top: selectionMenu.y,
-            transform: 'translate(-50%, -120%)'
-          }}
+          style={{ left: selectionMenu.x, top: selectionMenu.y, transform: 'translate(-50%, -120%)' }}
         >
-          <button 
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => handleOpenCharacterModal(selectionMenu.text)}
-            className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-700 hover:text-white rounded-md transition-colors whitespace-nowrap"
-          >
-            <User className="w-3 h-3 text-emerald-400" />
-            Create character
+          <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleOpenCharacterModal(selectionMenu.text)} className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-700 hover:text-white rounded-md transition-colors whitespace-nowrap">
+            <User className="w-3 h-3 text-emerald-400" /> Create character
           </button>
           <div className="w-px h-4 bg-zinc-600" />
-          <button 
-             onMouseDown={(e) => e.preventDefault()}
-             onClick={() => handleGenerateMain(selectionMenu.text, 'SCENE')}
-             className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-700 hover:text-white rounded-md transition-colors whitespace-nowrap"
-          >
-            <Film className="w-3 h-3 text-indigo-400" />
-            Create scene
+          <button onMouseDown={(e) => e.preventDefault()} onClick={() => handlePrepareSceneShot(selectionMenu.text)} className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-700 hover:text-white rounded-md transition-colors whitespace-nowrap">
+            <Film className="w-3 h-3 text-indigo-400" /> Create shot
           </button>
         </div>
       )}
 
       {/* Navigation Bar */}
-      <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-900/50">
+      <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-900/50 flex-none">
         <div className="flex items-center">
-          <button 
-            onClick={onBack}
-            className="flex items-center space-x-2 text-zinc-400 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span>Back to Script</span>
+          <button onClick={onBack} className="flex items-center space-x-2 text-zinc-400 hover:text-white transition-colors">
+            <ArrowLeft className="w-5 h-5" /> <span>Back to Script</span>
           </button>
           <div className="ml-6 flex items-center space-x-2 text-zinc-500">
-              <span>/</span>
-              <span className="font-screenplay font-bold text-zinc-200">{heading}</span>
+              <span>/</span><span className="font-screenplay font-bold text-zinc-200">{heading}</span>
           </div>
         </div>
-
-        {/* Character Bank Controls */}
         <div className="flex items-center space-x-2">
-            <button 
-                onClick={onOpenCharacterList}
-                className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 rounded-md text-sm transition-colors border border-zinc-700"
-            >
-                <Users className="w-4 h-4" />
-                <span>Character List</span>
-                {savedCharacters.length > 0 && (
-                    <span className="bg-emerald-600 text-white text-[10px] px-1.5 rounded-full">{savedCharacters.length}</span>
-                )}
+            <button onClick={onOpenCharacterList} className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 rounded-md text-sm transition-colors border border-zinc-700">
+                <Users className="w-4 h-4" /> <span>Character List</span>
+                {savedCharacters.length > 0 && <span className="bg-emerald-600 text-white text-[10px] px-1.5 rounded-full">{savedCharacters.length}</span>}
             </button>
             <div className="h-4 w-px bg-zinc-700 mx-1"></div>
             <div className="flex items-center gap-1">
@@ -435,64 +413,196 @@ export const Storyboard: React.FC<StoryboardProps> = ({
           </div>
         </div>
 
-        {/* Right: Visualization */}
-        <div className="w-2/3 p-12 flex flex-col items-center justify-center bg-zinc-950 relative">
-          
-          {generatedScene ? (
-            <div className="w-full max-w-4xl flex flex-col gap-4 animate-in fade-in zoom-in duration-300">
-                <div className="relative group w-full aspect-video rounded-lg overflow-hidden shadow-2xl border border-zinc-800 bg-black">
-                    <img src={generatedScene.image_url} alt="Storyboard" className="w-full h-full object-contain" />
-                </div>
-                <div className="flex justify-between items-start text-sm">
-                    <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                            generationType === 'CHARACTER' ? 'bg-emerald-900/50 text-emerald-400 border border-emerald-900' :
-                            generationType === 'SCENE' ? 'bg-indigo-900/50 text-indigo-400 border border-indigo-900' :
-                            'bg-zinc-800 text-zinc-400 border border-zinc-700'
-                        }`}>
-                            {generationType.replace('_', ' ')}
-                        </span>
-                        <p className="text-zinc-500 line-clamp-1 italic max-w-md">"{promptUsed}"</p>
+        {/* Right: Visualization Workspace */}
+        <div className="w-2/3 flex flex-col bg-zinc-950 overflow-hidden">
+            
+            {/* Top: Shot Generator (Visible ONLY when activeScriptContext is set) */}
+            {activeScriptContext && (
+                <div className="flex-none p-6 border-b border-zinc-800 bg-zinc-900/30 animate-in slide-in-from-top-4 fade-in duration-300">
+                    <div className="flex items-center justify-between mb-4">
+                         <div className="flex items-center gap-2 text-indigo-400 text-sm font-bold uppercase tracking-wider">
+                             <Clapperboard className="w-4 h-4" />
+                             New Shot
+                         </div>
+                         <button onClick={() => setActiveScriptContext(null)} className="text-zinc-500 hover:text-white"><X className="w-4 h-4" /></button>
                     </div>
-                    <button 
-                        onClick={() => handleGenerateMain(promptUsed, generationType)}
-                        className="text-zinc-400 hover:text-white flex items-center gap-2 text-xs"
-                    >
-                        <Loader2 className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
-                        Regenerate
-                    </button>
+
+                    <div className="max-w-4xl mx-auto flex gap-6">
+                        {/* Form */}
+                        <div className="flex-1 space-y-4">
+                            {/* Script Context Display */}
+                            <div className="bg-black/50 border-l-2 border-indigo-500 p-3 rounded-r text-xs text-zinc-400 font-screenplay italic">
+                                "{activeScriptContext}"
+                            </div>
+
+                            <div className="flex gap-4">
+                                <div className="w-1/2">
+                                    <label className="text-xs font-semibold text-zinc-400 uppercase mb-1 block">Shot Type <span className="text-zinc-600 font-normal normal-case">(Optional)</span></label>
+                                    <select 
+                                        value={shotForm.shotType}
+                                        onChange={e => setShotForm(p => ({...p, shotType: e.target.value}))}
+                                        className="w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-sm text-white outline-none focus:border-emerald-500"
+                                    >
+                                        <option value="">Select...</option>
+                                        {SHOT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                </div>
+                                <div className="w-1/2">
+                                    <label className="text-xs font-semibold text-zinc-400 uppercase mb-1 block">Composition <span className="text-zinc-600 font-normal normal-case">(Optional)</span></label>
+                                    <select 
+                                        value={shotForm.shotComposition}
+                                        onChange={e => setShotForm(p => ({...p, shotComposition: e.target.value}))}
+                                        className="w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-sm text-white outline-none focus:border-emerald-500"
+                                    >
+                                        <option value="">Select...</option>
+                                        {SHOT_COMPOSITIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-xs font-semibold text-zinc-400 uppercase mb-1 block">Visual Description <span className="text-emerald-500">*</span></label>
+                                <textarea 
+                                    value={shotForm.description}
+                                    onChange={e => setShotForm(p => ({...p, description: e.target.value}))}
+                                    placeholder="Describe the imagery: lighting, mood, action details..."
+                                    className="w-full bg-zinc-950 border border-zinc-700 rounded p-3 text-sm text-white outline-none h-24 resize-none focus:border-emerald-500"
+                                />
+                            </div>
+                            <button 
+                                onClick={handleGenerateShot}
+                                disabled={isLoading || !shotForm.description.trim()}
+                                className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white py-2 rounded-lg font-medium flex items-center justify-center gap-2"
+                            >
+                                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                                Generate Shot
+                            </button>
+                        </div>
+
+                        {/* Preview Area */}
+                        <div className="w-[320px] bg-black rounded-lg border border-zinc-800 flex flex-col overflow-hidden relative">
+                            {generatedPreview ? (
+                                <>
+                                    <img src={generatedPreview.image_url} className="w-full h-48 object-cover" />
+                                    <div className="p-3 flex-1 flex flex-col gap-2">
+                                        <input 
+                                            type="text" 
+                                            value={previewNote}
+                                            onChange={e => setPreviewNote(e.target.value)}
+                                            placeholder="Add a note (e.g., 'V2, warmer light')"
+                                            className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-xs text-white outline-none"
+                                        />
+                                        <div className="flex gap-2 mt-auto">
+                                            <button onClick={handleSaveShot} className="flex-1 bg-white text-black py-1.5 rounded text-xs font-bold hover:bg-zinc-200">Save</button>
+                                            <button onClick={() => setGeneratedPreview(null)} className="px-3 bg-zinc-800 text-zinc-400 py-1.5 rounded text-xs hover:text-white">Discard</button>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center flex-col text-zinc-700 gap-2">
+                                    {isLoading ? <Loader2 className="w-8 h-8 animate-spin text-emerald-600" /> : <ImageIcon className="w-12 h-12" />}
+                                    <span className="text-xs">{isLoading ? 'Generating...' : 'Preview will appear here'}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Bottom: Storyboard Sequence (List) */}
+            <div className="flex-1 overflow-y-auto p-6 bg-zinc-950">
+                <div className="max-w-4xl mx-auto">
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <Clapperboard className="w-5 h-5 text-indigo-500" />
+                        Sequence ({storyboardItems.length})
+                    </h3>
+                    
+                    {storyboardItems.length === 0 ? (
+                        <div className="border-2 border-dashed border-zinc-800 rounded-xl p-12 flex flex-col items-center justify-center text-zinc-600">
+                            <Film className="w-12 h-12 mb-3 opacity-20" />
+                            <p>No shots generated for this scene yet.</p>
+                            <p className="text-sm">Highlight text in the script to start visualizing.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-6">
+                            {storyboardItems.map((item, index) => (
+                                <div key={item.id} className="flex flex-col bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden group hover:border-zinc-700 transition-colors">
+                                    <div className="flex">
+                                        {/* Handle / Index */}
+                                        <div className="w-10 bg-zinc-900 border-r border-zinc-800 flex flex-col items-center justify-center gap-2 text-zinc-600">
+                                            <span className="font-mono text-sm">{index + 1}</span>
+                                        </div>
+                                        
+                                        {/* Image */}
+                                        <div className="w-64 aspect-video bg-black flex-shrink-0 relative cursor-pointer border-r border-zinc-800" onClick={() => window.open(item.image.image_url, '_blank')}>
+                                            <img src={item.image.image_url} className="w-full h-full object-cover" />
+                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                                        </div>
+
+                                        {/* Details */}
+                                        <div className="flex-1 p-4 flex flex-col gap-3">
+                                            {/* Reference Text */}
+                                            {item.scriptContext && (
+                                                <div className="flex items-start gap-2">
+                                                    <Quote className="w-3 h-3 text-zinc-600 mt-1 flex-shrink-0" />
+                                                    <p className="text-xs text-zinc-500 font-screenplay italic leading-relaxed">"{item.scriptContext}"</p>
+                                                </div>
+                                            )}
+
+                                            {/* Technical Details */}
+                                            <div className="flex gap-2">
+                                                {item.shotType && <span className="text-[10px] font-bold uppercase bg-indigo-900/50 text-indigo-300 px-2 py-0.5 rounded border border-indigo-900">{item.shotType}</span>}
+                                                {item.shotComposition && <span className="text-[10px] font-bold uppercase bg-emerald-900/50 text-emerald-300 px-2 py-0.5 rounded border border-emerald-900">{item.shotComposition}</span>}
+                                            </div>
+
+                                            {/* Visual Description */}
+                                            <div>
+                                                <span className="text-[10px] uppercase text-zinc-600 font-bold block mb-1">Visual Prompt</span>
+                                                <p className="text-sm text-zinc-300">"{item.description}"</p>
+                                            </div>
+                                            
+                                            {/* Notes Input */}
+                                            <div className="flex items-center gap-2 mt-auto pt-2 border-t border-zinc-800/50">
+                                                <Edit3 className="w-3 h-3 text-zinc-600" />
+                                                <input 
+                                                    type="text" 
+                                                    value={item.note}
+                                                    onChange={(e) => handleUpdateNote(item.id, e.target.value)}
+                                                    placeholder="Add production notes..."
+                                                    className="bg-transparent text-sm text-zinc-300 placeholder-zinc-600 outline-none w-full border-b border-transparent focus:border-zinc-700"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Actions */}
+                                        <div className="w-12 border-l border-zinc-800 flex flex-col items-center justify-center gap-2 bg-zinc-900">
+                                            <button 
+                                                onClick={() => handleMoveItem(index, 'up')}
+                                                disabled={index === 0}
+                                                className="p-1 text-zinc-500 hover:text-white disabled:opacity-30"
+                                            >
+                                                <ArrowUp className="w-4 h-4" />
+                                            </button>
+                                            <button 
+                                                onClick={() => handleMoveItem(index, 'down')}
+                                                disabled={index === storyboardItems.length - 1}
+                                                className="p-1 text-zinc-500 hover:text-white disabled:opacity-30"
+                                            >
+                                                <ArrowDown className="w-4 h-4" />
+                                            </button>
+                                            <button 
+                                                onClick={() => handleDeleteItem(item.id)}
+                                                className="p-1 text-zinc-500 hover:text-red-500 mt-2"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
-          ) : (
-            <div className="text-center space-y-6 max-w-md">
-              <div className="w-24 h-24 bg-zinc-900 rounded-2xl mx-auto flex items-center justify-center border border-zinc-800">
-                 {isLoading ? <Loader2 className="w-10 h-10 animate-spin text-emerald-500" /> : <Clapperboard className="w-10 h-10 text-zinc-600" />}
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-white mb-2">Visualize Scene</h3>
-                <p className="text-zinc-500">
-                  Select text from the script to generate specific details, or generate a master shot for the whole scene below.
-                </p>
-              </div>
-              <button
-                onClick={() => handleGenerateMain(constructFullScenePrompt(), 'FULL_SCENE')}
-                disabled={isLoading}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-lg font-medium transition-colors flex items-center space-x-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Connecting to Backend...</span>
-                  </>
-                ) : (
-                  <>
-                    <ImageIcon className="w-4 h-4" />
-                    <span>Generate Master Shot</span>
-                  </>
-                )}
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </div>
