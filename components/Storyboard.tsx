@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ScriptElement, CharacterProfile, ArtStyle, GeneratedImage, StoryboardItem } from '../types';
-import { ArrowLeft, Loader2, Image as ImageIcon, Clapperboard, User, Film, Sparkles, X, Plus, Users, Save, Trash2, ArrowUp, ArrowDown, Edit3, Camera, Quote } from 'lucide-react';
+import { ArrowLeft, Loader2, Image as ImageIcon, Clapperboard, User, Film, Sparkles, X, Plus, Users, Save, Trash2, ArrowUp, ArrowDown, Edit3, Camera, Quote, CheckCircle2 } from 'lucide-react';
 import { generateImage } from '../services/apiService';
 
 interface StoryboardProps {
@@ -37,6 +37,7 @@ interface ShotFormState {
   sceneNumber: string | number;
   shotNumber: string;
   scriptElementId?: string;
+  referenceImages: string[];
 }
 
 const ART_STYLES: ArtStyle[] = [
@@ -102,7 +103,8 @@ export const Storyboard: React.FC<StoryboardProps> = ({
       description: '',
       sceneNumber: '',
       shotNumber: '',
-      scriptElementId: undefined
+      scriptElementId: undefined,
+      referenceImages: []
   });
 
   // State for the currently generated but unsaved image
@@ -255,10 +257,41 @@ export const Storyboard: React.FC<StoryboardProps> = ({
           description: '', 
           sceneNumber: currentSceneNumber || '',
           shotNumber: (storyboardItems.length + 1).toString(),
-          scriptElementId: elementId
+          scriptElementId: elementId,
+          referenceImages: []
       });
       setSelectionMenu(null);
       window.getSelection()?.removeAllRanges();
+  };
+
+  const handleShotReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      Array.from(files).forEach((file: any) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64 = reader.result as string;
+          setShotForm(prev => ({
+            ...prev,
+            referenceImages: [...prev.referenceImages, base64]
+          }));
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  };
+
+  const toggleShotReference = (url: string) => {
+      if (!activeScriptContext) return; // Only work when creating a shot
+      setShotForm(prev => {
+          const exists = prev.referenceImages.includes(url);
+          return {
+              ...prev,
+              referenceImages: exists 
+                  ? prev.referenceImages.filter(u => u !== url)
+                  : [...prev.referenceImages, url]
+          };
+      });
   };
 
   const handleGenerateShot = async () => {
@@ -272,7 +305,7 @@ export const Storyboard: React.FC<StoryboardProps> = ({
         // Use the manual description for the prompt, NOT the context
         finalPrompt += `Description: ${shotForm.description}`;
 
-        const result = await generateImage(finalPrompt);
+        const result = await generateImage(finalPrompt, shotForm.referenceImages);
         setGeneratedPreview(result);
         setPreviewNote('');
     } catch (error) {
@@ -611,6 +644,28 @@ export const Storyboard: React.FC<StoryboardProps> = ({
                                     className="w-full bg-zinc-950 border border-zinc-700 rounded p-3 text-sm text-white outline-none h-24 resize-none focus:border-emerald-500"
                                 />
                             </div>
+
+                            {/* Reference Images Section */}
+                            <div>
+                                <label className="text-xs font-semibold text-zinc-400 uppercase mb-1 block">Reference Images</label>
+                                <div className="flex gap-2 items-center overflow-x-auto pb-2 min-h-[56px]">
+                                   {shotForm.referenceImages.map((img, idx) => (
+                                     <div key={idx} className="relative w-12 h-12 flex-shrink-0 rounded overflow-hidden border border-zinc-700">
+                                        <img src={img} className="w-full h-full object-cover" />
+                                        <button onClick={() => setShotForm(prev => ({...prev, referenceImages: prev.referenceImages.filter((_, i) => i !== idx)}))} className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 flex items-center justify-center text-red-500"><X className="w-4 h-4" /></button>
+                                     </div>
+                                   ))}
+                                   <label className="w-12 h-12 flex-shrink-0 rounded border border-dashed border-zinc-600 flex items-center justify-center hover:bg-zinc-800 cursor-pointer" title="Upload Image">
+                                      <Plus className="w-4 h-4 text-zinc-500" />
+                                      <input type="file" accept="image/*" multiple onChange={handleShotReferenceUpload} className="hidden" />
+                                   </label>
+                                   <div className="ml-2 text-[10px] text-zinc-500 italic flex items-center gap-1 border-l border-zinc-800 pl-3">
+                                       <Sparkles className="w-3 h-3" />
+                                       Click images in the sequence list below to use as references.
+                                   </div>
+                                </div>
+                            </div>
+
                             <button 
                                 onClick={handleGenerateShot}
                                 disabled={isLoading || !shotForm.description.trim()}
@@ -667,11 +722,14 @@ export const Storyboard: React.FC<StoryboardProps> = ({
                         </div>
                     ) : (
                         <div className="space-y-6">
-                            {storyboardItems.map((item, index) => (
+                            {storyboardItems.map((item, index) => {
+                                const isReference = activeScriptContext && shotForm.referenceImages.includes(item.image.image_url);
+                                
+                                return (
                                 <div 
                                     key={item.id} 
                                     ref={(el) => { itemRefs.current[item.id] = el; }}
-                                    className="flex flex-col bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden group hover:border-zinc-700 transition-all duration-500"
+                                    className={`flex flex-col bg-zinc-900 border rounded-lg overflow-hidden group transition-all duration-500 ${isReference ? 'border-emerald-500 shadow-[0_0_15px_-3px_rgba(16,185,129,0.3)]' : 'border-zinc-800 hover:border-zinc-700'}`}
                                 >
                                     <div className="flex">
                                         {/* Handle / Index */}
@@ -683,9 +741,27 @@ export const Storyboard: React.FC<StoryboardProps> = ({
                                         </div>
                                         
                                         {/* Image */}
-                                        <div className="w-64 aspect-video bg-black flex-shrink-0 relative cursor-pointer border-r border-zinc-800" onClick={() => window.open(item.image.image_url, '_blank')}>
+                                        <div 
+                                            className="w-64 aspect-video bg-black flex-shrink-0 relative cursor-pointer border-r border-zinc-800 group/image" 
+                                            onClick={() => activeScriptContext ? toggleShotReference(item.image.image_url) : window.open(item.image.image_url, '_blank')}
+                                        >
                                             <img src={item.image.image_url} className="w-full h-full object-cover" />
-                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                                            {/* Reference Toggle Overlay */}
+                                            {activeScriptContext && (
+                                                <div className={`absolute inset-0 flex items-center justify-center transition-all ${isReference ? 'bg-emerald-500/20' : 'bg-black/0 group-hover/image:bg-black/40'}`}>
+                                                    {isReference && (
+                                                        <div className="bg-emerald-600 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 shadow-lg">
+                                                            <CheckCircle2 className="w-3 h-3" /> Reference
+                                                        </div>
+                                                    )}
+                                                    {!isReference && (
+                                                        <div className="opacity-0 group-hover/image:opacity-100 bg-zinc-900/80 text-white px-3 py-1 rounded-full text-xs font-bold border border-zinc-600">
+                                                            Use as Reference
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {!activeScriptContext && <div className="absolute inset-0 bg-black/0 group-hover/image:bg-black/10 transition-colors" />}
                                         </div>
 
                                         {/* Details */}
@@ -754,7 +830,8 @@ export const Storyboard: React.FC<StoryboardProps> = ({
                                         </div>
                                     </div>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>
