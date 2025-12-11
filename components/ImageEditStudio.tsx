@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Wand2, Eraser, Move, Undo2, Download, RefreshCw, Layers, Check, X, Sparkles, ImagePlus, Aperture } from 'lucide-react';
+import { ArrowLeft, Wand2, Eraser, Move, Undo2, Download, RefreshCw, Layers, Check, X, Sparkles, ImagePlus, Aperture, UserMinus } from 'lucide-react';
 import { GeneratedImage } from '../types';
-import { eraseImage, generativeFill, removeBackground, replaceBackground, blurBackground } from '../services/apiService';
+import { eraseImage, generativeFill, removeBackground, replaceBackground, blurBackground, removeForeground } from '../services/apiService';
 
 interface ImageEditStudioProps {
   image: GeneratedImage | null;
@@ -16,7 +16,7 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
 }) => {
   const [currentImage, setCurrentImage] = useState<GeneratedImage | null>(initialImage);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTool, setActiveTool] = useState<'move' | 'eraser' | 'gen_fill' | 'remove_bg' | 'replace_bg' | 'blur_bg'>('move');
+  const [activeTool, setActiveTool] = useState<'move' | 'eraser' | 'gen_fill' | 'remove_bg' | 'replace_bg' | 'blur_bg' | 'remove_fg'>('move');
   const [brushSize, setBrushSize] = useState(50);
   const [genFillPrompt, setGenFillPrompt] = useState('');
   
@@ -173,6 +173,8 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
             result = await generativeFill(currentImage.image_url, maskBase64, genFillPrompt);
         } else if (activeTool === 'remove_bg') {
             result = await removeBackground(currentImage.image_url);
+        } else if (activeTool === 'remove_fg') {
+            result = await removeForeground(currentImage.image_url);
         } else if (activeTool === 'blur_bg') {
             result = await blurBackground(currentImage.image_url, blurScale);
         } else if (activeTool === 'replace_bg') {
@@ -334,14 +336,6 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
                           <span className="text-xs font-medium">Gen Fill</span>
                       </button>
                       <button 
-                        onClick={() => setActiveTool('remove_bg')}
-                        disabled={hasUnsavedChanges}
-                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'remove_bg' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
-                      >
-                          <Layers className="w-6 h-6" />
-                          <span className="text-xs font-medium">Remove BG</span>
-                      </button>
-                      <button 
                         onClick={() => setActiveTool('blur_bg')}
                         disabled={hasUnsavedChanges}
                         className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'blur_bg' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
@@ -350,12 +344,28 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
                           <span className="text-xs font-medium">Blur BG</span>
                       </button>
                       <button 
+                        onClick={() => setActiveTool('remove_bg')}
+                        disabled={hasUnsavedChanges}
+                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'remove_bg' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
+                      >
+                          <Layers className="w-6 h-6" />
+                          <span className="text-xs font-medium">Remove BG</span>
+                      </button>
+                       <button 
+                        onClick={() => setActiveTool('remove_fg')}
+                        disabled={hasUnsavedChanges}
+                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'remove_fg' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
+                      >
+                          <UserMinus className="w-6 h-6" />
+                          <span className="text-xs font-medium">Remove FG</span>
+                      </button>
+                      <button 
                         onClick={() => setActiveTool('replace_bg')}
                         disabled={hasUnsavedChanges}
-                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'replace_bg' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
+                        className={`p-4 col-span-2 rounded-xl border flex flex-row items-center justify-center gap-3 transition-all ${activeTool === 'replace_bg' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
                       >
-                          <ImagePlus className="w-6 h-6" />
-                          <span className="text-xs font-medium">Replace BG</span>
+                          <ImagePlus className="w-5 h-5" />
+                          <span className="text-xs font-medium">Replace Background</span>
                       </button>
                   </div>
               </div>
@@ -442,6 +452,30 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
                         >
                             <Layers className="w-4 h-4" />
                             Remove Background
+                        </button>
+                    </div>
+                )}
+
+                {/* Remove FG Controls */}
+                {activeTool === 'remove_fg' && !hasUnsavedChanges && (
+                    <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-6">
+                        <div className="p-4 bg-zinc-950/50 rounded-xl border border-zinc-800">
+                             <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                                <UserMinus className="w-4 h-4 text-indigo-500" />
+                                Remove Foreground
+                             </h4>
+                             <p className="text-xs text-zinc-400 leading-relaxed">
+                                Automatically detect and remove the main subject (foreground), leaving the background.
+                             </p>
+                        </div>
+                        
+                        <button 
+                            onClick={handleApplyTool}
+                            disabled={isProcessing}
+                            className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20"
+                        >
+                            <UserMinus className="w-4 h-4" />
+                            Remove Foreground
                         </button>
                     </div>
                 )}
