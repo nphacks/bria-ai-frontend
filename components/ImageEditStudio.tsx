@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Wand2, Eraser, Move, Undo2, Download, RefreshCw, Layers, Check, X } from 'lucide-react';
+import { ArrowLeft, Wand2, Eraser, Move, Undo2, Download, RefreshCw, Layers, Check, X, Sparkles } from 'lucide-react';
 import { GeneratedImage } from '../types';
-import { eraseImage } from '../services/apiService';
+import { eraseImage, generativeFill } from '../services/apiService';
 
 interface ImageEditStudioProps {
   image: GeneratedImage | null;
@@ -12,8 +12,9 @@ interface ImageEditStudioProps {
 export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initialImage, onBack, onSave }) => {
   const [currentImage, setCurrentImage] = useState<GeneratedImage | null>(initialImage);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTool, setActiveTool] = useState<'move' | 'eraser'>('move');
+  const [activeTool, setActiveTool] = useState<'move' | 'eraser' | 'gen_fill'>('move');
   const [brushSize, setBrushSize] = useState(50);
+  const [genFillPrompt, setGenFillPrompt] = useState('');
   
   // Canvas & Image Refs
   const containerRef = useRef<HTMLDivElement>(null);
@@ -26,6 +27,8 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initial
   const [hasMask, setHasMask] = useState(false);
   const [imageScale, setImageScale] = useState(1);
   const [isHoveringCanvas, setIsHoveringCanvas] = useState(false);
+
+  const isMaskingTool = activeTool === 'eraser' || activeTool === 'gen_fill';
 
   // Sync state when prop updates (e.g. after save)
   useEffect(() => {
@@ -84,14 +87,14 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initial
   };
 
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
-    if (activeTool !== 'eraser') return;
+    if (!isMaskingTool) return;
     setIsDrawing(true);
     draw(e);
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     // Update custom cursor position
-    if (activeTool === 'eraser' && cursorRef.current) {
+    if (isMaskingTool && cursorRef.current) {
       cursorRef.current.style.transform = `translate(${e.clientX}px, ${e.clientY}px) translate(-50%, -50%)`;
     }
 
@@ -102,11 +105,11 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initial
 
   const draw = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawing && e.type !== 'mousedown' && e.type !== 'touchstart') return;
-    if (activeTool !== 'eraser' || !canvasRef.current) return;
+    if (!isMaskingTool || !canvasRef.current) return;
     
     // For touch events we need to prevent scrolling
     if (e.type.startsWith('touch')) {
-       // e.preventDefault(); // Moved to listener level if possible or keep here
+       // e.preventDefault(); 
     }
 
     const ctx = canvasRef.current.getContext('2d');
@@ -137,25 +140,34 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initial
     ctx?.beginPath(); // Reset path
   };
 
-  const handleApplyErase = async () => {
+  const handleApplyTool = async () => {
     if (!currentImage || !canvasRef.current || !hasMask) return;
 
     setIsProcessing(true);
     try {
-        // Prepare Mask
-        // Convert canvas to base64
         const maskBase64 = canvasRef.current.toDataURL('image/png');
+        let result: GeneratedImage;
+
+        if (activeTool === 'eraser') {
+            result = await eraseImage(currentImage.image_url, maskBase64);
+        } else if (activeTool === 'gen_fill') {
+            if (!genFillPrompt.trim()) {
+                alert("Please enter a prompt for Generative Fill.");
+                setIsProcessing(false);
+                return;
+            }
+            result = await generativeFill(currentImage.image_url, maskBase64, genFillPrompt);
+        } else {
+            return;
+        }
         
-        // Call API
-        const result = await eraseImage(currentImage.image_url, maskBase64);
-        
-        // Update current image with result
         setCurrentImage(result);
         clearCanvas();
-        setActiveTool('move'); // Reset tool to view mode
+        setActiveTool('move');
+        setGenFillPrompt('');
     } catch (error) {
-        console.error("Erase failed", error);
-        alert("Failed to erase area. See console for details.");
+        console.error("Operation failed", error);
+        alert("Failed to process image. See console for details.");
     } finally {
         setIsProcessing(false);
     }
@@ -164,7 +176,6 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initial
   const handleSave = () => {
       if (initialImage && currentImage) {
           onSave(initialImage, currentImage);
-          // Canvas cleared in useEffect due to prop change
       }
   };
 
@@ -198,7 +209,7 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initial
           <div 
             ref={containerRef}
             className="flex-1 bg-zinc-950 relative overflow-hidden flex items-center justify-center p-8 select-none"
-            style={{ cursor: activeTool === 'eraser' ? 'none' : 'default' }}
+            style={{ cursor: isMaskingTool ? 'none' : 'default' }}
           >
               <div className="relative shadow-2xl rounded-lg overflow-hidden border border-zinc-800 bg-zinc-900/50">
                   {/* Base Image */}
@@ -224,12 +235,12 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initial
                     onTouchStart={startDrawing}
                     onTouchMove={draw}
                     onTouchEnd={stopDrawing}
-                    className={`absolute inset-0 w-full h-full touch-none transition-opacity duration-200 ${activeTool === 'eraser' ? 'pointer-events-auto opacity-60' : 'pointer-events-none opacity-0'}`}
+                    className={`absolute inset-0 w-full h-full touch-none transition-opacity duration-200 ${isMaskingTool ? 'pointer-events-auto opacity-60' : 'pointer-events-none opacity-0'}`}
                     style={{ mixBlendMode: 'plus-lighter' }} // Makes the white mask look like a highlight
                   />
 
-                  {/* Custom Cursor for Eraser */}
-                  {activeTool === 'eraser' && !isProcessing && (
+                  {/* Custom Cursor for Masking Tools */}
+                  {isMaskingTool && !isProcessing && (
                       <div 
                         ref={cursorRef}
                         className="fixed pointer-events-none rounded-full border-2 border-white shadow-[0_0_10px_rgba(0,0,0,0.5)] z-50 bg-white/20 transition-opacity duration-75"
@@ -273,14 +284,22 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initial
                         className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'eraser' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
                       >
                           <Eraser className="w-6 h-6" />
-                          <span className="text-xs font-medium">Erase Area</span>
+                          <span className="text-xs font-medium">Erase Object</span>
+                      </button>
+                      <button 
+                        onClick={() => setActiveTool('gen_fill')}
+                        disabled={hasUnsavedChanges}
+                        className={`p-4 col-span-2 rounded-xl border flex flex-row items-center justify-center gap-3 transition-all ${activeTool === 'gen_fill' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
+                      >
+                          <Sparkles className="w-5 h-5" />
+                          <span className="text-xs font-medium">Generative Fill</span>
                       </button>
                   </div>
               </div>
 
               <div className="flex-1 overflow-y-auto">
-                {/* Tool Options */}
-                {activeTool === 'eraser' && !hasUnsavedChanges && (
+                {/* Common Masking Controls */}
+                {isMaskingTool && !hasUnsavedChanges && (
                     <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-6">
                         <div className="p-4 bg-zinc-950/50 rounded-xl border border-zinc-800">
                             <div className="flex justify-between mb-2">
@@ -303,6 +322,18 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initial
                             </div>
                         </div>
 
+                        {activeTool === 'gen_fill' && (
+                             <div className="space-y-2">
+                                <label className="text-xs font-bold text-zinc-400 uppercase">Prompt</label>
+                                <textarea 
+                                    value={genFillPrompt}
+                                    onChange={(e) => setGenFillPrompt(e.target.value)}
+                                    placeholder="Describe what to add in the masked area..."
+                                    className="w-full h-20 bg-zinc-950 border border-zinc-700 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none resize-none"
+                                />
+                             </div>
+                        )}
+
                         <div className="flex gap-2">
                             <button 
                                     onClick={clearCanvas}
@@ -314,16 +345,22 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ image: initial
                         </div>
 
                         <button 
-                            onClick={handleApplyErase}
-                            disabled={!hasMask || isProcessing}
-                            className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20"
+                            onClick={handleApplyTool}
+                            disabled={!hasMask || isProcessing || (activeTool === 'gen_fill' && !genFillPrompt.trim())}
+                            className={`w-full py-4 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
+                                activeTool === 'gen_fill' 
+                                ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/20' 
+                                : 'bg-rose-600 hover:bg-rose-500 shadow-rose-900/20'
+                            }`}
                         >
-                            <Wand2 className="w-4 h-4" />
-                            Generate Erase
+                            {activeTool === 'gen_fill' ? <Sparkles className="w-4 h-4" /> : <Wand2 className="w-4 h-4" />}
+                            {activeTool === 'gen_fill' ? 'Generate Fill' : 'Erase Area'}
                         </button>
                         
                         <p className="text-[10px] text-zinc-500 text-center leading-relaxed">
-                            Paint over the area you want to remove. The AI will fill it based on the surrounding context.
+                            {activeTool === 'gen_fill' 
+                                ? 'Paint over the area you want to modify, describe the change, and generate.' 
+                                : 'Paint over the area you want to remove. The AI will fill it based on context.'}
                         </p>
                     </div>
                 )}

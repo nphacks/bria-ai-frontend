@@ -151,3 +151,41 @@ export const eraseImage = async (imageUrl: string, maskBase64: string): Promise<
     throw error;
   }
 };
+
+export const generativeFill = async (imageUrl: string, maskBase64: string, prompt: string): Promise<GeneratedImage> => {
+  try {
+    // Remove data URI prefix if present
+    const cleanMask = maskBase64.replace(/^data:image\/\w+;base64,/, "");
+
+    const response = await fetch('http://localhost:8000/edit/gen_fill', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        image: imageUrl,
+        mask: cleanMask,
+        prompt: prompt,
+        version: 2,
+        sync: true
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Backend error (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.image_url) {
+        if (data.result_url) return normalizeGeneratedImage({ image_url: data.result_url });
+        throw new Error('No image URL returned from backend');
+    }
+
+    return normalizeGeneratedImage(data);
+  } catch (error) {
+    console.error('Generative fill failed:', error);
+    throw error;
+  }
+};
