@@ -1,13 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Wand2, Eraser, Move, Undo2, Download, RefreshCw, Layers, Check, X, Sparkles, ImagePlus, Aperture, UserMinus } from 'lucide-react';
+import { ArrowLeft, Wand2, Eraser, Move, Undo2, Download, RefreshCw, Layers, Check, X, Sparkles, ImagePlus, Aperture, UserMinus, Maximize } from 'lucide-react';
 import { GeneratedImage } from '../types';
-import { eraseImage, generativeFill, removeBackground, replaceBackground, blurBackground, removeForeground } from '../services/apiService';
+import { eraseImage, generativeFill, removeBackground, replaceBackground, blurBackground, removeForeground, expandImage } from '../services/apiService';
 
 interface ImageEditStudioProps {
   image: GeneratedImage | null;
   onBack: () => void;
   onSave: (original: GeneratedImage, newImage: GeneratedImage) => void;
 }
+
+const ASPECT_RATIOS = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9"];
 
 export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ 
     image: initialImage, 
@@ -16,7 +18,7 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
 }) => {
   const [currentImage, setCurrentImage] = useState<GeneratedImage | null>(initialImage);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTool, setActiveTool] = useState<'move' | 'eraser' | 'gen_fill' | 'remove_bg' | 'replace_bg' | 'blur_bg' | 'remove_fg'>('move');
+  const [activeTool, setActiveTool] = useState<'move' | 'eraser' | 'gen_fill' | 'remove_bg' | 'replace_bg' | 'blur_bg' | 'remove_fg' | 'expand'>('move');
   const [brushSize, setBrushSize] = useState(50);
   const [genFillPrompt, setGenFillPrompt] = useState('');
   
@@ -25,6 +27,10 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
 
   // Blur BG State
   const [blurScale, setBlurScale] = useState(3);
+
+  // Expand State
+  const [expandAspectRatio, setExpandAspectRatio] = useState('16:9');
+  const [expandPrompt, setExpandPrompt] = useState('');
   
   // Canvas & Image Refs
   const containerRef = useRef<HTMLDivElement>(null);
@@ -184,6 +190,8 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
                 return;
             }
             result = await replaceBackground(currentImage.image_url, replaceBgPrompt);
+        } else if (activeTool === 'expand') {
+            result = await expandImage(currentImage.image_url, expandAspectRatio, expandPrompt);
         } else {
             return;
         }
@@ -194,6 +202,7 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
         setActiveTool('move');
         setGenFillPrompt('');
         setReplaceBgPrompt('');
+        setExpandPrompt('');
     } catch (error) {
         console.error("Operation failed", error);
         alert("Failed to process image. See console for details.");
@@ -359,13 +368,21 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
                           <UserMinus className="w-6 h-6" />
                           <span className="text-xs font-medium">Remove FG</span>
                       </button>
+                       <button 
+                        onClick={() => setActiveTool('expand')}
+                        disabled={hasUnsavedChanges}
+                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'expand' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
+                      >
+                          <Maximize className="w-6 h-6" />
+                          <span className="text-xs font-medium">Expand</span>
+                      </button>
                       <button 
                         onClick={() => setActiveTool('replace_bg')}
                         disabled={hasUnsavedChanges}
-                        className={`p-4 col-span-2 rounded-xl border flex flex-row items-center justify-center gap-3 transition-all ${activeTool === 'replace_bg' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
+                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'replace_bg' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
                       >
-                          <ImagePlus className="w-5 h-5" />
-                          <span className="text-xs font-medium">Replace Background</span>
+                          <ImagePlus className="w-6 h-6" />
+                          <span className="text-xs font-medium">Replace BG</span>
                       </button>
                   </div>
               </div>
@@ -520,6 +537,55 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
                         >
                             <Aperture className="w-4 h-4" />
                             Apply Blur
+                        </button>
+                    </div>
+                )}
+
+                {/* Expand Image Controls */}
+                {activeTool === 'expand' && !hasUnsavedChanges && (
+                    <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-6">
+                         <div className="p-4 bg-zinc-950/50 rounded-xl border border-zinc-800">
+                             <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                                <Maximize className="w-4 h-4 text-indigo-500" />
+                                Expand Image
+                             </h4>
+                             <p className="text-xs text-zinc-400 leading-relaxed mb-4">
+                                Extend the borders of the image to a new aspect ratio, filling the space with AI-generated content.
+                             </p>
+                             
+                             <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-zinc-400 uppercase mb-1 block">New Aspect Ratio</label>
+                                    <select 
+                                        value={expandAspectRatio}
+                                        onChange={(e) => setExpandAspectRatio(e.target.value)}
+                                        className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-sm text-white outline-none focus:border-indigo-500"
+                                    >
+                                        {ASPECT_RATIOS.map(ratio => (
+                                            <option key={ratio} value={ratio}>{ratio}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label className="text-xs font-bold text-zinc-400 uppercase mb-1 block">Prompt (Optional)</label>
+                                    <textarea 
+                                        value={expandPrompt}
+                                        onChange={(e) => setExpandPrompt(e.target.value)}
+                                        placeholder="Describe the extended surroundings..."
+                                        className="w-full h-20 bg-zinc-900 border border-zinc-700 rounded p-2 text-sm text-white outline-none focus:border-indigo-500 resize-none"
+                                    />
+                                </div>
+                             </div>
+                        </div>
+                        
+                        <button 
+                            onClick={handleApplyTool}
+                            disabled={isProcessing}
+                            className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20"
+                        >
+                            <Maximize className="w-4 h-4" />
+                            Expand Image
                         </button>
                     </div>
                 )}

@@ -327,3 +327,40 @@ export const replaceBackground = async (imageUrl: string, prompt: string): Promi
     throw error;
   }
 };
+
+export const expandImage = async (imageUrl: string, aspectRatio?: string, prompt?: string): Promise<GeneratedImage> => {
+  try {
+    const body: any = {
+      image: imageUrl,
+      preserve_alpha: true,
+      sync: true
+    };
+    if (aspectRatio) body.aspect_ratio = aspectRatio;
+    if (prompt) body.prompt = prompt;
+
+    const response = await fetch('http://localhost:8000/edit/expand/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Backend error (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.image_url) {
+        if (data.result_url) return normalizeGeneratedImage({ image_url: data.result_url });
+        throw new Error('No image URL returned from backend');
+    }
+
+    return normalizeGeneratedImage(data);
+  } catch (error) {
+    console.error('Expand image failed:', error);
+    throw error;
+  }
+};
