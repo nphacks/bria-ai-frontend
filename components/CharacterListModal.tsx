@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CharacterProfile, ArtStyle } from '../types';
 import { Users, Download, Upload, X, ChevronLeft, ImageIcon, Sparkles, Loader2, Wand2, CheckCircle2, User } from 'lucide-react';
 import { generateImage, normalizeGeneratedImage } from '../services/apiService';
@@ -31,8 +31,16 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
   const [selectedReferenceUrls, setSelectedReferenceUrls] = useState<string[]>([]);
   const [isGeneratingNew, setIsGeneratingNew] = useState(false);
   const [generationArtStyle, setGenerationArtStyle] = useState<ArtStyle>('Cinematic/Digital');
+  
+  // Track which field is currently being edited
+  const [editingField, setEditingField] = useState<'name' | 'description' | 'visualDetails' | null>(null);
 
   const activeCharacter = characters.find(c => c.id === activeCharacterId);
+
+  // Reset editing state when switching characters
+  useEffect(() => {
+    setEditingField(null);
+  }, [activeCharacterId]);
 
   if (!isOpen) return null;
 
@@ -161,12 +169,25 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
                          </button>
                          
                          <div>
-                             <input 
-                                type="text" 
-                                value={activeCharacter.name}
-                                onChange={(e) => onUpdateCharacter({...activeCharacter, name: e.target.value})}
-                                className="text-2xl font-bold text-white mb-1 bg-transparent border-b border-transparent hover:border-zinc-700 focus:border-emerald-500 outline-none w-full transition-colors"
-                             />
+                             {editingField === 'name' ? (
+                                <input 
+                                    autoFocus
+                                    type="text" 
+                                    value={activeCharacter.name}
+                                    onChange={(e) => onUpdateCharacter({...activeCharacter, name: e.target.value})}
+                                    onBlur={() => setEditingField(null)}
+                                    onKeyDown={(e) => e.key === 'Enter' && setEditingField(null)}
+                                    className="text-2xl font-bold text-white mb-1 bg-zinc-800 border-b border-emerald-500 outline-none w-full px-1 rounded-t"
+                                />
+                             ) : (
+                                <h2 
+                                    onClick={() => setEditingField('name')}
+                                    className="text-2xl font-bold text-white mb-1 cursor-pointer hover:bg-zinc-800/50 rounded px-1 -mx-1 border border-transparent hover:border-zinc-700/50 truncate"
+                                    title="Click to edit name"
+                                >
+                                    {activeCharacter.name}
+                                </h2>
+                             )}
                              <span className="inline-block bg-zinc-800 text-zinc-400 text-xs px-2 py-1 rounded border border-zinc-700">
                                  {activeCharacter.artStyle}
                              </span>
@@ -175,19 +196,43 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
                          <div className="space-y-4">
                             <div>
                                 <h4 className="text-xs font-bold text-emerald-500 uppercase mb-2">Description</h4>
-                                <textarea 
-                                    value={activeCharacter.description}
-                                    onChange={(e) => onUpdateCharacter({...activeCharacter, description: e.target.value})}
-                                    className="text-sm text-zinc-300 leading-relaxed bg-transparent w-full h-32 border border-transparent hover:border-zinc-700 focus:border-emerald-500 rounded p-2 -ml-2 outline-none transition-colors scrollbar-thin scrollbar-thumb-zinc-700"
-                                />
+                                {editingField === 'description' ? (
+                                    <textarea 
+                                        autoFocus
+                                        value={activeCharacter.description}
+                                        onChange={(e) => onUpdateCharacter({...activeCharacter, description: e.target.value})}
+                                        onBlur={() => setEditingField(null)}
+                                        className="text-sm text-zinc-300 leading-relaxed bg-zinc-800 w-full h-32 border border-emerald-500 rounded p-2 outline-none resize-none"
+                                    />
+                                ) : (
+                                    <div 
+                                        onClick={() => setEditingField('description')}
+                                        className="text-sm text-zinc-300 leading-relaxed cursor-pointer hover:bg-zinc-800/50 rounded p-2 -ml-2 border border-transparent hover:border-zinc-700/50 min-h-[50px] whitespace-pre-wrap"
+                                        title="Click to edit description"
+                                    >
+                                        {activeCharacter.description || <span className="italic text-zinc-600">No description. Click to add.</span>}
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <h4 className="text-xs font-bold text-emerald-500 uppercase mb-2">Visual Details</h4>
-                                <textarea 
-                                    value={activeCharacter.visualDetails}
-                                    onChange={(e) => onUpdateCharacter({...activeCharacter, visualDetails: e.target.value})}
-                                    className="text-sm text-zinc-300 leading-relaxed bg-transparent w-full h-32 border border-transparent hover:border-zinc-700 focus:border-emerald-500 rounded p-2 -ml-2 outline-none transition-colors scrollbar-thin scrollbar-thumb-zinc-700"
-                                />
+                                {editingField === 'visualDetails' ? (
+                                    <textarea 
+                                        autoFocus
+                                        value={activeCharacter.visualDetails}
+                                        onChange={(e) => onUpdateCharacter({...activeCharacter, visualDetails: e.target.value})}
+                                        onBlur={() => setEditingField(null)}
+                                        className="text-sm text-zinc-300 leading-relaxed bg-zinc-800 w-full h-32 border border-emerald-500 rounded p-2 outline-none resize-none"
+                                    />
+                                ) : (
+                                    <div 
+                                        onClick={() => setEditingField('visualDetails')}
+                                        className="text-sm text-zinc-300 leading-relaxed cursor-pointer hover:bg-zinc-800/50 rounded p-2 -ml-2 border border-transparent hover:border-zinc-700/50 min-h-[50px] whitespace-pre-wrap"
+                                        title="Click to edit visual details"
+                                    >
+                                        {activeCharacter.visualDetails || <span className="italic text-zinc-600">No visual details. Click to add.</span>}
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <h4 className="text-xs font-bold text-zinc-500 uppercase mb-2">Source Images</h4>
