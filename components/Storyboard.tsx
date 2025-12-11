@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ScriptElement, CharacterProfile, ArtStyle, GeneratedImage, StoryboardItem } from '../types';
-import { ArrowLeft, Loader2, Image as ImageIcon, Clapperboard, User, Film, Sparkles, X, Plus, Users, Save, Trash2, ArrowUp, ArrowDown, Edit3, Camera, Quote, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Image as ImageIcon, Clapperboard, User, Film, Sparkles, X, Plus, Users, Save, Trash2, ArrowUp, ArrowDown, Edit3, Camera, Quote, CheckCircle2, LayoutGrid } from 'lucide-react';
 import { generateImage } from '../services/apiService';
 
 interface StoryboardProps {
@@ -82,6 +82,10 @@ export const Storyboard: React.FC<StoryboardProps> = ({
   // Character Creation State (Separate from the List Modal)
   const [isCharacterModalOpen, setIsCharacterModalOpen] = useState(false);
   
+  // Character Selector for Shot Generation
+  const [showCharacterSelector, setShowCharacterSelector] = useState(false);
+  const [selectorCharacterId, setSelectorCharacterId] = useState<string | null>(null);
+
   // Context for the shot being created
   const [activeScriptContext, setActiveScriptContext] = useState<string | null>(null);
 
@@ -121,6 +125,13 @@ export const Storyboard: React.FC<StoryboardProps> = ({
     document.addEventListener('click', handleDocumentClick);
     return () => document.removeEventListener('click', handleDocumentClick);
   }, [selectionMenu]);
+
+  // Set default selected character when selector opens
+  useEffect(() => {
+    if (showCharacterSelector && !selectorCharacterId && savedCharacters.length > 0) {
+        setSelectorCharacterId(savedCharacters[0].id);
+    }
+  }, [showCharacterSelector, savedCharacters]);
 
   const sceneHeadingEl = sceneElements.find(el => el.type === 'SCENE_HEADING');
   const heading = sceneHeadingEl?.content || 'Unknown Scene';
@@ -486,6 +497,82 @@ export const Storyboard: React.FC<StoryboardProps> = ({
         </div>
       )}
 
+      {/* Character Reference Selection Modal */}
+      {showCharacterSelector && (
+        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-4xl h-[80vh] flex flex-col shadow-2xl overflow-hidden">
+                <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900">
+                    <h3 className="font-bold text-lg text-white flex items-center gap-2">
+                        <Users className="w-5 h-5 text-emerald-500" />
+                        Select Character Reference
+                    </h3>
+                    <button onClick={() => setShowCharacterSelector(false)} className="text-zinc-500 hover:text-white"><X className="w-6 h-6" /></button>
+                </div>
+                
+                <div className="flex-1 flex overflow-hidden">
+                    {/* Character List Sidebar */}
+                    <div className="w-64 border-r border-zinc-800 overflow-y-auto bg-zinc-900/50">
+                        {savedCharacters.map(char => (
+                            <button
+                                key={char.id}
+                                onClick={() => setSelectorCharacterId(char.id)}
+                                className={`w-full text-left p-4 hover:bg-zinc-800 transition-colors border-b border-zinc-800/50 flex items-center gap-3 ${selectorCharacterId === char.id ? 'bg-zinc-800 border-l-2 border-l-emerald-500' : ''}`}
+                            >
+                                <div className="w-8 h-8 rounded-full bg-black overflow-hidden border border-zinc-700 flex-shrink-0">
+                                    {char.generatedPortraits[0] ? (
+                                        <img src={char.generatedPortraits[0].image_url} className="w-full h-full object-cover" />
+                                    ) : <User className="w-full h-full p-1 text-zinc-600" />}
+                                </div>
+                                <span className="font-medium text-sm text-zinc-200 truncate">{char.name}</span>
+                            </button>
+                        ))}
+                        {savedCharacters.length === 0 && (
+                            <div className="p-8 text-center text-zinc-500 text-sm">No characters created yet.</div>
+                        )}
+                    </div>
+
+                    {/* Image Grid */}
+                    <div className="flex-1 p-6 overflow-y-auto bg-black">
+                        {selectorCharacterId ? (
+                            <div className="grid grid-cols-3 md:grid-cols-4 gap-4">
+                                {savedCharacters.find(c => c.id === selectorCharacterId)?.generatedPortraits.map((img, idx) => {
+                                    const isSelected = shotForm.referenceImages.includes(img.image_url);
+                                    return (
+                                        <div 
+                                            key={idx}
+                                            onClick={() => toggleShotReference(img.image_url)}
+                                            className={`relative aspect-square rounded-lg overflow-hidden border-2 cursor-pointer group ${isSelected ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-zinc-800 hover:border-zinc-600'}`}
+                                        >
+                                            <img src={img.image_url} className="w-full h-full object-cover" />
+                                            {isSelected && (
+                                                <div className="absolute top-2 right-2 bg-emerald-500 text-black rounded-full p-1 shadow-lg">
+                                                    <CheckCircle2 className="w-4 h-4" />
+                                                </div>
+                                            )}
+                                            {!isSelected && (
+                                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                             <div className="h-full flex flex-col items-center justify-center text-zinc-600">
+                                <User className="w-16 h-16 mb-4 opacity-20" />
+                                <p>Select a character to view images</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+                 <div className="p-4 border-t border-zinc-800 bg-zinc-900 flex justify-end">
+                    <button onClick={() => setShowCharacterSelector(false)} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium">
+                        Done
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
       {/* Floating Selection Menu */}
       {selectionMenu && (
         <div 
@@ -659,6 +746,13 @@ export const Storyboard: React.FC<StoryboardProps> = ({
                                       <Plus className="w-4 h-4 text-zinc-500" />
                                       <input type="file" accept="image/*" multiple onChange={handleShotReferenceUpload} className="hidden" />
                                    </label>
+                                   <button 
+                                        onClick={() => setShowCharacterSelector(true)}
+                                        className="w-12 h-12 flex-shrink-0 rounded border border-dashed border-zinc-600 flex items-center justify-center hover:bg-zinc-800 text-zinc-500 hover:text-white transition-colors"
+                                        title="Select from Characters"
+                                    >
+                                        <User className="w-5 h-5" />
+                                    </button>
                                    <div className="ml-2 text-[10px] text-zinc-500 italic flex items-center gap-1 border-l border-zinc-800 pl-3">
                                        <Sparkles className="w-3 h-3" />
                                        Click images in the sequence list below to use as references.
