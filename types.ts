@@ -41,8 +41,20 @@ export interface StoryboardItem {
   id: string;
   image: GeneratedImage;
   note: string;
+  
+  // Legacy fields
   shotType?: string;
   shotComposition?: string;
+  
+  // New fields
+  shotSize?: string;
+  framing?: string;
+  cameraAngle?: string;
+  
+  // Sequence fields
+  sceneNumber?: number;
+  shotNumber?: string;
+
   description: string; // The visual description used for generation
   scriptContext: string; // The selected text from the script
 }

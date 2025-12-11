@@ -29,9 +29,12 @@ interface CharacterFormState {
 }
 
 interface ShotFormState {
-  shotType: string;
-  shotComposition: string;
+  shotSize: string;
+  framing: string;
+  cameraAngle: string;
   description: string;
+  sceneNumber: string | number;
+  shotNumber: string;
 }
 
 const ART_STYLES: ArtStyle[] = [
@@ -42,12 +45,16 @@ const ART_STYLES: ArtStyle[] = [
   'Ink Illustration'
 ];
 
-const SHOT_TYPES = [
-    'Extreme Wide Shot', 'Wide Shot', 'Full Shot', 'Medium Shot', 'Close Up', 'Extreme Close Up'
+const SHOT_SIZES = [
+  'Establishing', 'Master', 'Wide', 'Full', 'Medium Full', 'Medium', 'Medium Close Up', 'Close Up', 'Extreme Close Up'
 ];
 
-const SHOT_COMPOSITIONS = [
-    'Center Framed', 'Rule of Thirds', 'Symmetrical', 'Low Angle', 'High Angle', 'Overhead', 'Dutch Angle'
+const FRAMING_OPTIONS = [
+  'Single', 'Two Character', '3 or more characters', 'Crowd', 'Over the Shoulder', 'Point of View', 'Insert'
+];
+
+const CAMERA_ANGLES = [
+  'Low', 'High', 'Overhead', 'Dutch', 'Eye Level', 'Shoulder', 'Hip/Cowboy', 'Knee', 'Ground'
 ];
 
 export const Storyboard: React.FC<StoryboardProps> = ({ 
@@ -84,9 +91,12 @@ export const Storyboard: React.FC<StoryboardProps> = ({
 
   // New Shot Form State
   const [shotForm, setShotForm] = useState<ShotFormState>({
-      shotType: '',
-      shotComposition: '',
-      description: ''
+      shotSize: '',
+      framing: '',
+      cameraAngle: '',
+      description: '',
+      sceneNumber: '',
+      shotNumber: ''
   });
 
   // State for the currently generated but unsaved image
@@ -104,7 +114,9 @@ export const Storyboard: React.FC<StoryboardProps> = ({
     return () => document.removeEventListener('click', handleDocumentClick);
   }, [selectionMenu]);
 
-  const heading = sceneElements.find(el => el.type === 'SCENE_HEADING')?.content || 'Unknown Scene';
+  const sceneHeadingEl = sceneElements.find(el => el.type === 'SCENE_HEADING');
+  const heading = sceneHeadingEl?.content || 'Unknown Scene';
+  const currentSceneNumber = sceneHeadingEl?.sceneNumber;
   
   const handleTextSelection = () => {
     const selection = window.getSelection();
@@ -207,9 +219,12 @@ export const Storyboard: React.FC<StoryboardProps> = ({
       // Set the selected text as the context, but start with empty description
       setActiveScriptContext(text);
       setShotForm({
-          shotType: '',
-          shotComposition: '',
-          description: '' // User must fill this
+          shotSize: '',
+          framing: '',
+          cameraAngle: '',
+          description: '', 
+          sceneNumber: currentSceneNumber || '',
+          shotNumber: (storyboardItems.length + 1).toString()
       });
       setSelectionMenu(null);
       window.getSelection()?.removeAllRanges();
@@ -219,8 +234,9 @@ export const Storyboard: React.FC<StoryboardProps> = ({
     setIsLoading(true);
     try {
         let finalPrompt = `Cinematic movie scene. 8k resolution. `;
-        if (shotForm.shotType) finalPrompt += `Shot Type: ${shotForm.shotType}. `;
-        if (shotForm.shotComposition) finalPrompt += `Composition: ${shotForm.shotComposition}. `;
+        if (shotForm.shotSize) finalPrompt += `Shot Size: ${shotForm.shotSize}. `;
+        if (shotForm.framing) finalPrompt += `Framing: ${shotForm.framing}. `;
+        if (shotForm.cameraAngle) finalPrompt += `Camera Angle: ${shotForm.cameraAngle}. `;
         
         // Use the manual description for the prompt, NOT the context
         finalPrompt += `Description: ${shotForm.description}`;
@@ -243,10 +259,13 @@ export const Storyboard: React.FC<StoryboardProps> = ({
           id: Date.now().toString(),
           image: generatedPreview,
           note: previewNote,
-          shotType: shotForm.shotType,
-          shotComposition: shotForm.shotComposition,
+          shotSize: shotForm.shotSize,
+          framing: shotForm.framing,
+          cameraAngle: shotForm.cameraAngle,
           description: shotForm.description,
-          scriptContext: activeScriptContext
+          scriptContext: activeScriptContext,
+          sceneNumber: typeof shotForm.sceneNumber === 'number' ? shotForm.sceneNumber : parseInt(shotForm.sceneNumber as string) || 0,
+          shotNumber: shotForm.shotNumber
       };
 
       onUpdateStoryboard([...storyboardItems, newItem]);
@@ -434,31 +453,67 @@ export const Storyboard: React.FC<StoryboardProps> = ({
                             <div className="bg-black/50 border-l-2 border-indigo-500 p-3 rounded-r text-xs text-zinc-400 font-screenplay italic">
                                 "{activeScriptContext}"
                             </div>
-
+                            
+                            {/* Scene # and Shot # */}
                             <div className="flex gap-4">
-                                <div className="w-1/2">
-                                    <label className="text-xs font-semibold text-zinc-400 uppercase mb-1 block">Shot Type <span className="text-zinc-600 font-normal normal-case">(Optional)</span></label>
+                                <div className="w-1/4">
+                                    <label className="text-xs font-semibold text-zinc-400 uppercase mb-1 block">Scene #</label>
+                                    <input 
+                                        type="text"
+                                        readOnly
+                                        value={shotForm.sceneNumber}
+                                        className="w-full bg-zinc-900/50 border border-zinc-800 rounded p-2 text-sm text-zinc-500 outline-none cursor-not-allowed"
+                                    />
+                                </div>
+                                <div className="w-1/4">
+                                    <label className="text-xs font-semibold text-zinc-400 uppercase mb-1 block">Shot #</label>
+                                    <input 
+                                        type="text"
+                                        value={shotForm.shotNumber}
+                                        onChange={e => setShotForm(p => ({...p, shotNumber: e.target.value}))}
+                                        placeholder="1, 1A..."
+                                        className="w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-sm text-white outline-none focus:border-emerald-500"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Shot Params: Shot Size, Framing, Camera Angle */}
+                            <div className="flex gap-4">
+                                <div className="w-1/3">
+                                    <label className="text-xs font-semibold text-zinc-400 uppercase mb-1 block">Shot Size</label>
                                     <select 
-                                        value={shotForm.shotType}
-                                        onChange={e => setShotForm(p => ({...p, shotType: e.target.value}))}
+                                        value={shotForm.shotSize}
+                                        onChange={e => setShotForm(p => ({...p, shotSize: e.target.value}))}
                                         className="w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-sm text-white outline-none focus:border-emerald-500"
                                     >
                                         <option value="">Select...</option>
-                                        {SHOT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                        {SHOT_SIZES.map(t => <option key={t} value={t}>{t}</option>)}
                                     </select>
                                 </div>
-                                <div className="w-1/2">
-                                    <label className="text-xs font-semibold text-zinc-400 uppercase mb-1 block">Composition <span className="text-zinc-600 font-normal normal-case">(Optional)</span></label>
+                                <div className="w-1/3">
+                                    <label className="text-xs font-semibold text-zinc-400 uppercase mb-1 block">Framing</label>
                                     <select 
-                                        value={shotForm.shotComposition}
-                                        onChange={e => setShotForm(p => ({...p, shotComposition: e.target.value}))}
+                                        value={shotForm.framing}
+                                        onChange={e => setShotForm(p => ({...p, framing: e.target.value}))}
                                         className="w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-sm text-white outline-none focus:border-emerald-500"
                                     >
                                         <option value="">Select...</option>
-                                        {SHOT_COMPOSITIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                                        {FRAMING_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                                <div className="w-1/3">
+                                    <label className="text-xs font-semibold text-zinc-400 uppercase mb-1 block">Camera Angle</label>
+                                    <select 
+                                        value={shotForm.cameraAngle}
+                                        onChange={e => setShotForm(p => ({...p, cameraAngle: e.target.value}))}
+                                        className="w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-sm text-white outline-none focus:border-emerald-500"
+                                    >
+                                        <option value="">Select...</option>
+                                        {CAMERA_ANGLES.map(a => <option key={a} value={a}>{a}</option>)}
                                     </select>
                                 </div>
                             </div>
+                            
                             <div>
                                 <label className="text-xs font-semibold text-zinc-400 uppercase mb-1 block">Visual Description <span className="text-emerald-500">*</span></label>
                                 <textarea 
@@ -528,8 +583,11 @@ export const Storyboard: React.FC<StoryboardProps> = ({
                                 <div key={item.id} className="flex flex-col bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden group hover:border-zinc-700 transition-colors">
                                     <div className="flex">
                                         {/* Handle / Index */}
-                                        <div className="w-10 bg-zinc-900 border-r border-zinc-800 flex flex-col items-center justify-center gap-2 text-zinc-600">
-                                            <span className="font-mono text-sm">{index + 1}</span>
+                                        <div className="w-12 bg-zinc-900 border-r border-zinc-800 flex flex-col items-center justify-center gap-1 text-zinc-500 px-1">
+                                            {item.sceneNumber !== undefined && (
+                                                <span className="text-[10px] uppercase font-bold text-zinc-600">SC {item.sceneNumber}</span>
+                                            )}
+                                            <span className="font-mono text-xl font-bold text-white">{item.shotNumber || (index + 1)}</span>
                                         </div>
                                         
                                         {/* Image */}
@@ -548,10 +606,16 @@ export const Storyboard: React.FC<StoryboardProps> = ({
                                                 </div>
                                             )}
 
-                                            {/* Technical Details */}
-                                            <div className="flex gap-2">
+                                            {/* Technical Details (Legacy + New) */}
+                                            <div className="flex gap-2 flex-wrap">
+                                                {/* Legacy Display */}
                                                 {item.shotType && <span className="text-[10px] font-bold uppercase bg-indigo-900/50 text-indigo-300 px-2 py-0.5 rounded border border-indigo-900">{item.shotType}</span>}
                                                 {item.shotComposition && <span className="text-[10px] font-bold uppercase bg-emerald-900/50 text-emerald-300 px-2 py-0.5 rounded border border-emerald-900">{item.shotComposition}</span>}
+                                                
+                                                {/* New Fields Display */}
+                                                {item.shotSize && <span className="text-[10px] font-bold uppercase bg-indigo-900/50 text-indigo-300 px-2 py-0.5 rounded border border-indigo-900">{item.shotSize}</span>}
+                                                {item.framing && <span className="text-[10px] font-bold uppercase bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded border border-blue-900">{item.framing}</span>}
+                                                {item.cameraAngle && <span className="text-[10px] font-bold uppercase bg-purple-900/50 text-purple-300 px-2 py-0.5 rounded border border-purple-900">{item.cameraAngle}</span>}
                                             </div>
 
                                             {/* Visual Description */}

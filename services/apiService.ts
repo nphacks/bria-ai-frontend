@@ -9,7 +9,7 @@ export const normalizeGeneratedImage = (data: any): GeneratedImage => {
     return { image_url: data };
   }
 
-  // Handle nested image_url object (The specific fix requested)
+  // Handle nested image_url object
   if (data.image_url && typeof data.image_url === 'object') {
     const nested = data.image_url;
     return {
@@ -23,18 +23,58 @@ export const normalizeGeneratedImage = (data: any): GeneratedImage => {
   return data as GeneratedImage;
 };
 
-export const generateImage = async (prompt: string, referenceImages?: string[]): Promise<GeneratedImage> => {
+export const generateImage = async (prompt: string, referenceImages?: (string | GeneratedImage)[]): Promise<GeneratedImage> => {
   try {
-    const response = await fetch('http://localhost:8000/generate', {
+    // Default to prompt-only endpoint
+    let url = 'http://localhost:8000/generate/prompt';
+    let body: any = { prompt };
+
+    // Switch to unified endpoint if reference images exist
+    if (referenceImages && referenceImages.length > 0) {
+      url = 'http://localhost:8000/generate/unified';
+      
+      const images: string[] = [];
+      const seeds: number[] = [];
+      const structured_prompts: any[] = [];
+
+      referenceImages.forEach(ref => {
+        if (typeof ref === 'string') {
+          // External image (base64 or url)
+          images.push(ref);
+        } else {
+          // Bria GeneratedImage object
+          images.push(ref.image_url);
+          
+          // Extract metadata if available (specific to Bria images)
+          if (ref.seed !== undefined) {
+             seeds.push(ref.seed);
+          }
+          if (ref.structured_prompt) {
+             structured_prompts.push(ref.structured_prompt);
+          }
+        }
+      });
+
+      body = {
+        prompt,
+        images,
+        // Only include seeds and structured_prompts if we actually collected some
+        seeds: seeds.length > 0 ? seeds : undefined,
+        structured_prompts: structured_prompts.length > 0 ? structured_prompts : undefined
+      };
+    }
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ prompt, referenceImages }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
-      throw new Error(`Backend error: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Backend error (${response.status}): ${errorText}`);
     }
 
     const data = await response.json();

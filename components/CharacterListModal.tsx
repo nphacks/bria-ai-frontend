@@ -91,7 +91,13 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
         
         Specific Scenario/Action: ${newGenPrompt}`;
 
-        const result = await generateImage(prompt, selectedReferenceUrls);
+        // Map selected URLs back to full GeneratedImage objects if possible
+        const references = selectedReferenceUrls.map(url => {
+            const generated = activeCharacter.generatedPortraits.find(p => p.image_url === url);
+            return generated || url;
+        });
+
+        const result = await generateImage(prompt, references);
         
         const updatedChar: CharacterProfile = {
             ...activeCharacter,
