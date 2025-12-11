@@ -3,10 +3,11 @@ import { ScreenplayEditor } from './components/ScreenplayEditor';
 import { Header } from './components/Header';
 import { Storyboard } from './components/Storyboard';
 import { CharacterListModal } from './components/CharacterListModal';
-import { ScriptElement, CharacterProfile, StoryboardItem, ProjectData } from './types';
+import { ImageEditStudio } from './components/ImageEditStudio';
+import { ScriptElement, CharacterProfile, StoryboardItem, ProjectData, GeneratedImage } from './types';
 import { normalizeGeneratedImage } from './services/apiService';
 
-type ViewState = 'EDITOR' | 'STORYBOARD';
+type ViewState = 'EDITOR' | 'STORYBOARD' | 'EDIT_STUDIO';
 
 const DEFAULT_SCRIPT: ScriptElement[] = [
     { id: '1', type: 'SCENE_HEADING', content: 'EXT. OCEAN - DAY', sceneNumber: 1 },
@@ -36,6 +37,9 @@ const App: React.FC = () => {
 
   const [selectedScene, setSelectedScene] = useState<ScriptElement[]>([]);
   const [isCharacterListOpen, setIsCharacterListOpen] = useState(false);
+  
+  // Edit Studio State
+  const [selectedImageForEdit, setSelectedImageForEdit] = useState<GeneratedImage | null>(null);
 
   const handleNavigateToStoryboard = (sceneElements: ScriptElement[]) => {
     setSelectedScene(sceneElements);
@@ -45,6 +49,22 @@ const App: React.FC = () => {
   const handleBackToEditor = () => {
     setView('EDITOR');
     setSelectedScene([]);
+  };
+
+  const handleNavigateToEditStudio = (image: GeneratedImage) => {
+    setSelectedImageForEdit(image);
+    setIsCharacterListOpen(false);
+    setView('EDIT_STUDIO');
+  };
+
+  const handleBackFromEditStudio = () => {
+      // Return to previous context based on state
+      if (selectedScene.length > 0) {
+          setView('STORYBOARD');
+      } else {
+          setView('EDITOR');
+      }
+      setSelectedImageForEdit(null);
   };
 
   // --- Project Import / Export ---
@@ -181,7 +201,7 @@ const App: React.FC = () => {
             onUpdateElements={setElements}
             onNavigateToStoryboard={handleNavigateToStoryboard} 
           />
-        ) : (
+        ) : view === 'STORYBOARD' ? (
           <Storyboard 
             sceneElements={selectedScene} 
             onBack={handleBackToEditor} 
@@ -190,6 +210,12 @@ const App: React.FC = () => {
             onOpenCharacterList={() => setIsCharacterListOpen(true)}
             storyboardItems={getActiveStoryboardItems()}
             onUpdateStoryboard={handleUpdateStoryboardItems}
+            onNavigateToEditStudio={handleNavigateToEditStudio}
+          />
+        ) : (
+          <ImageEditStudio 
+            image={selectedImageForEdit}
+            onBack={handleBackFromEditStudio}
           />
         )}
       </main>
@@ -200,6 +226,7 @@ const App: React.FC = () => {
         characters={savedCharacters}
         onUpdateCharacter={handleUpdateCharacter}
         onImportCharacters={handleImportCharacters}
+        onNavigateToEditStudio={handleNavigateToEditStudio}
       />
     </div>
   );

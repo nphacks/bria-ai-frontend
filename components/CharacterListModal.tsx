@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { CharacterProfile, ArtStyle } from '../types';
-import { Users, Download, Upload, X, ChevronLeft, ImageIcon, Sparkles, Loader2, Wand2, CheckCircle2, User } from 'lucide-react';
+import { CharacterProfile, ArtStyle, GeneratedImage } from '../types';
+import { Users, Download, Upload, X, ChevronLeft, ImageIcon, Sparkles, Loader2, Wand2, CheckCircle2, User, Edit2 } from 'lucide-react';
 import { generateImage, normalizeGeneratedImage } from '../services/apiService';
 
 interface CharacterListModalProps {
@@ -9,6 +9,7 @@ interface CharacterListModalProps {
   characters: CharacterProfile[];
   onUpdateCharacter: (character: CharacterProfile) => void;
   onImportCharacters: (characters: CharacterProfile[]) => void;
+  onNavigateToEditStudio: (image: GeneratedImage) => void;
 }
 
 const ART_STYLES: ArtStyle[] = [
@@ -24,7 +25,8 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
   onClose,
   characters,
   onUpdateCharacter,
-  onImportCharacters
+  onImportCharacters,
+  onNavigateToEditStudio
 }) => {
   const [activeCharacterId, setActiveCharacterId] = useState<string | null>(null);
   const [newGenPrompt, setNewGenPrompt] = useState('');
@@ -258,7 +260,6 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
                          <div className="flex-1 overflow-y-auto custom-scrollbar p-1">
                              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                                  {activeCharacter.generatedPortraits.map((img, idx) => {
-                                     // Direct access now safe due to normalization
                                      const imgUrl = img.image_url;
                                      const isSelected = selectedReferenceUrls.includes(imgUrl);
                                      
@@ -281,6 +282,18 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
                                                      <span className="text-xs bg-black/70 px-2 py-1 rounded text-white">Use as Ref</span>
                                                  </div>
                                              )}
+                                             
+                                             {/* Edit Button */}
+                                             <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onNavigateToEditStudio(img);
+                                                }}
+                                                className="absolute bottom-2 right-2 bg-zinc-800 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-all hover:scale-110 hover:bg-indigo-600 z-10 border border-zinc-700"
+                                                title="Edit in Studio"
+                                             >
+                                                <Edit2 className="w-3 h-3" />
+                                             </button>
                                          </div>
                                      );
                                  })}
@@ -387,7 +400,6 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
                                     <div className="aspect-square bg-black relative overflow-hidden">
                                         {char.generatedPortraits[0] ? (
                                             <img 
-                                                // Direct access due to normalization
                                                 src={char.generatedPortraits[0].image_url} 
                                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                                             />
@@ -422,4 +434,4 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
         </div>
     </div>
   );
-}
+};

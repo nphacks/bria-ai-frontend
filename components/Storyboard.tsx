@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ScriptElement, CharacterProfile, ArtStyle, GeneratedImage, StoryboardItem } from '../types';
-import { ArrowLeft, Loader2, Image as ImageIcon, Clapperboard, User, Film, Sparkles, X, Plus, Users, Save, Trash2, ArrowUp, ArrowDown, Edit3, Camera, Quote, CheckCircle2, LayoutGrid } from 'lucide-react';
+import { ArrowLeft, Loader2, Image as ImageIcon, Clapperboard, User, Film, Sparkles, X, Plus, Users, Save, Trash2, ArrowUp, ArrowDown, Edit3, Camera, Quote, CheckCircle2, LayoutGrid, Wand2 } from 'lucide-react';
 import { generateImage } from '../services/apiService';
 
 interface StoryboardProps {
@@ -11,6 +11,7 @@ interface StoryboardProps {
   onOpenCharacterList: () => void;
   storyboardItems: StoryboardItem[];
   onUpdateStoryboard: (items: StoryboardItem[]) => void;
+  onNavigateToEditStudio: (image: GeneratedImage) => void;
 }
 
 interface SelectionMenu {
@@ -67,7 +68,8 @@ export const Storyboard: React.FC<StoryboardProps> = ({
   onAddCharacter,
   onOpenCharacterList,
   storyboardItems,
-  onUpdateStoryboard
+  onUpdateStoryboard,
+  onNavigateToEditStudio
 }) => {
   // --- State ---
   const [isLoading, setIsLoading] = useState(false);
@@ -378,9 +380,6 @@ export const Storyboard: React.FC<StoryboardProps> = ({
 
       if (items.length === 0) return element.content;
 
-      // Sort items by position of their context in the text
-      // Note: This naive approach matches the first occurrence. 
-      // Ideally we would store start indices, but we'll infer for now.
       const sortedItems = [...items].sort((a, b) => {
          return element.content.indexOf(a.scriptContext) - element.content.indexOf(b.scriptContext);
       });
@@ -431,7 +430,7 @@ export const Storyboard: React.FC<StoryboardProps> = ({
       {isCharacterModalOpen && (
         <div className="fixed inset-0 z-[50] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col md:flex-row">
-            {/* ... Character Form UI (same as before) ... */}
+            {/* ... Character Form UI ... */}
             <div className="p-6 md:w-1/2 space-y-4 border-r border-zinc-800">
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-xl font-bold flex items-center gap-2">
@@ -837,7 +836,7 @@ export const Storyboard: React.FC<StoryboardProps> = ({
                                         {/* Image */}
                                         <div 
                                             className="w-64 aspect-video bg-black flex-shrink-0 relative cursor-pointer border-r border-zinc-800 group/image" 
-                                            onClick={() => activeScriptContext ? toggleShotReference(item.image.image_url) : window.open(item.image.image_url, '_blank')}
+                                            onClick={() => activeScriptContext ? toggleShotReference(item.image.image_url) : onNavigateToEditStudio(item.image)}
                                         >
                                             <img src={item.image.image_url} className="w-full h-full object-cover" />
                                             {/* Reference Toggle Overlay */}
@@ -855,7 +854,13 @@ export const Storyboard: React.FC<StoryboardProps> = ({
                                                     )}
                                                 </div>
                                             )}
-                                            {!activeScriptContext && <div className="absolute inset-0 bg-black/0 group-hover/image:bg-black/10 transition-colors" />}
+                                            {!activeScriptContext && (
+                                                <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover/image:bg-black/30 transition-all opacity-0 group-hover/image:opacity-100">
+                                                    <span className="flex items-center gap-2 bg-zinc-900/90 text-white px-3 py-1.5 rounded-full text-xs font-bold border border-zinc-700 shadow-lg transform translate-y-2 group-hover/image:translate-y-0 transition-transform">
+                                                        <Wand2 className="w-3 h-3 text-indigo-400" /> Edit in Studio
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Details */}
