@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CharacterProfile } from '../types';
+import { CharacterProfile, ArtStyle } from '../types';
 import { Users, Download, Upload, X, ChevronLeft, ImageIcon, Sparkles, Loader2, Wand2, CheckCircle2, User } from 'lucide-react';
 import { generateImage, normalizeGeneratedImage } from '../services/apiService';
 
@@ -10,6 +10,14 @@ interface CharacterListModalProps {
   onUpdateCharacter: (character: CharacterProfile) => void;
   onImportCharacters: (characters: CharacterProfile[]) => void;
 }
+
+const ART_STYLES: ArtStyle[] = [
+  'Cinematic/Digital',
+  'Pencil Sketch',
+  'Oil Painting',
+  'Watercolor',
+  'Ink Illustration'
+];
 
 export const CharacterListModal: React.FC<CharacterListModalProps> = ({
   isOpen,
@@ -22,6 +30,7 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
   const [newGenPrompt, setNewGenPrompt] = useState('');
   const [selectedReferenceUrls, setSelectedReferenceUrls] = useState<string[]>([]);
   const [isGeneratingNew, setIsGeneratingNew] = useState(false);
+  const [generationArtStyle, setGenerationArtStyle] = useState<ArtStyle>('Cinematic/Digital');
 
   const activeCharacter = characters.find(c => c.id === activeCharacterId);
 
@@ -87,7 +96,7 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
         const prompt = `Character: ${activeCharacter.name}. 
         ${activeCharacter.description}. 
         ${activeCharacter.visualDetails}. 
-        Art Style: ${activeCharacter.artStyle}. 
+        Art Style: ${generationArtStyle}. 
         
         Specific Scenario/Action: ${newGenPrompt}`;
 
@@ -152,7 +161,12 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
                          </button>
                          
                          <div>
-                             <h2 className="text-2xl font-bold text-white mb-1">{activeCharacter.name}</h2>
+                             <input 
+                                type="text" 
+                                value={activeCharacter.name}
+                                onChange={(e) => onUpdateCharacter({...activeCharacter, name: e.target.value})}
+                                className="text-2xl font-bold text-white mb-1 bg-transparent border-b border-transparent hover:border-zinc-700 focus:border-emerald-500 outline-none w-full transition-colors"
+                             />
                              <span className="inline-block bg-zinc-800 text-zinc-400 text-xs px-2 py-1 rounded border border-zinc-700">
                                  {activeCharacter.artStyle}
                              </span>
@@ -161,7 +175,11 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
                          <div className="space-y-4">
                             <div>
                                 <h4 className="text-xs font-bold text-emerald-500 uppercase mb-2">Description</h4>
-                                <p className="text-sm text-zinc-300 leading-relaxed">{activeCharacter.description}</p>
+                                <textarea 
+                                    value={activeCharacter.description}
+                                    onChange={(e) => onUpdateCharacter({...activeCharacter, description: e.target.value})}
+                                    className="text-sm text-zinc-300 leading-relaxed bg-transparent w-full h-32 border border-transparent hover:border-zinc-700 focus:border-emerald-500 rounded p-2 -ml-2 outline-none transition-colors scrollbar-thin scrollbar-thumb-zinc-700"
+                                />
                             </div>
                             <div>
                                 <h4 className="text-xs font-bold text-emerald-500 uppercase mb-2">Visual Details</h4>
@@ -232,6 +250,17 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
                          </h3>
 
                          <div className="flex-1 overflow-y-auto space-y-6">
+                             <div>
+                                <label className="text-xs font-semibold text-zinc-400 uppercase mb-2 block">Art Style</label>
+                                <select 
+                                    value={generationArtStyle} 
+                                    onChange={(e) => setGenerationArtStyle(e.target.value as ArtStyle)}
+                                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none"
+                                >
+                                    {ART_STYLES.map(style => <option key={style} value={style}>{style}</option>)}
+                                </select>
+                             </div>
+
                              <div>
                                  <label className="text-xs font-semibold text-zinc-400 uppercase mb-2 block">Prompt / Scenario</label>
                                  <textarea 
