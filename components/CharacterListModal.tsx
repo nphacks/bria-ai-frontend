@@ -188,9 +188,6 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
                                     {activeCharacter.name}
                                 </h2>
                              )}
-                             <span className="inline-block bg-zinc-800 text-zinc-400 text-xs px-2 py-1 rounded border border-zinc-700">
-                                 {activeCharacter.artStyle}
-                             </span>
                          </div>
 
                          <div className="space-y-4">
@@ -425,4 +422,4 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
         </div>
     </div>
   );
-};
+}
