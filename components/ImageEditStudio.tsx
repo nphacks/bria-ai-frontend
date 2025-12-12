@@ -373,33 +373,26 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
                             </div>
                          ) : (
                              <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
-                                 <div>
-                                     <span className="text-xs font-bold text-zinc-500 uppercase block mb-1">Short Description</span>
-                                     <p className="text-sm text-zinc-300 bg-zinc-900/50 p-2 rounded border border-zinc-800">
-                                        {typeof advancedData.short_description === 'string' ? advancedData.short_description : JSON.stringify(advancedData.short_description)}
-                                     </p>
-                                 </div>
-                                 <div>
-                                     <span className="text-xs font-bold text-zinc-500 uppercase block mb-1">Objects</span>
-                                     <div className="space-y-2">
-                                        {Array.isArray(advancedData.objects) && advancedData.objects.map((obj: any, idx: number) => (
-                                            <div key={idx} className="text-sm text-zinc-300 bg-zinc-900/50 p-2 rounded border border-zinc-800">
-                                                {typeof obj === 'string' ? obj : JSON.stringify(obj)}
+                                {Object.entries(advancedData).map(([key, value]) => (
+                                    <div key={key}>
+                                        <span className="text-xs font-bold text-zinc-500 uppercase block mb-1">
+                                            {key.replace(/_/g, ' ')}
+                                        </span>
+                                        {Array.isArray(value) ? (
+                                            <div className="space-y-2">
+                                                {value.map((item: any, idx: number) => (
+                                                    <div key={idx} className="text-sm text-zinc-300 bg-zinc-900/50 p-2 rounded border border-zinc-800">
+                                                        {typeof item === 'string' ? item : JSON.stringify(item)}
+                                                    </div>
+                                                ))}
                                             </div>
-                                        ))}
-                                        {!Array.isArray(advancedData.objects) && (
-                                            <p className="text-sm text-zinc-300 bg-zinc-900/50 p-2 rounded border border-zinc-800">
-                                                {JSON.stringify(advancedData.objects)}
+                                        ) : (
+                                            <p className="text-sm text-zinc-300 bg-zinc-900/50 p-2 rounded border border-zinc-800 whitespace-pre-wrap">
+                                                {typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
                                             </p>
                                         )}
-                                     </div>
-                                 </div>
-                                 <div>
-                                     <span className="text-xs font-bold text-zinc-500 uppercase block mb-1">Background</span>
-                                     <p className="text-sm text-zinc-300 bg-zinc-900/50 p-2 rounded border border-zinc-800">
-                                         {typeof advancedData.background_setting === 'string' ? advancedData.background_setting : JSON.stringify(advancedData.background_setting)}
-                                     </p>
-                                 </div>
+                                    </div>
+                                ))}
                              </div>
                          )}
                     </div>
