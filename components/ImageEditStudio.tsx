@@ -11,6 +11,8 @@ interface ImageEditStudioProps {
 
 const ASPECT_RATIOS = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9"];
 
+type EditTool = 'move' | 'eraser' | 'gen_fill' | 'remove_bg' | 'replace_bg' | 'blur_bg' | 'remove_fg' | 'expand' | 'advanced';
+
 export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ 
     image: initialImage, 
     onBack, 
@@ -18,7 +20,7 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
 }) => {
   const [currentImage, setCurrentImage] = useState<GeneratedImage | null>(initialImage);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTool, setActiveTool] = useState<'move' | 'eraser' | 'gen_fill' | 'remove_bg' | 'replace_bg' | 'blur_bg' | 'remove_fg' | 'expand' | 'advanced'>('move');
+  const [activeTool, setActiveTool] = useState<EditTool>('move');
   const [brushSize, setBrushSize] = useState(50);
   const [genFillPrompt, setGenFillPrompt] = useState('');
   
@@ -329,303 +331,32 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
           </div>
 
           {/* Right Toolbar */}
-          <div className="w-80 border-l border-zinc-800 bg-zinc-900 p-6 flex flex-col gap-6 z-20 shadow-xl">
+          <div className="w-96 border-l border-zinc-800 bg-zinc-900 p-6 flex flex-col gap-6 z-20 shadow-xl">
               
-              {/* Tool Selection */}
-              <div>
-                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-4">Tools</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                      <button 
-                        onClick={() => setActiveTool('move')}
-                        disabled={hasUnsavedChanges}
-                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'move' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
-                      >
-                          <Move className="w-6 h-6" />
-                          <span className="text-xs font-medium">View / Move</span>
-                      </button>
-                      <button 
-                        onClick={() => setActiveTool('eraser')}
-                        disabled={hasUnsavedChanges}
-                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'eraser' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
-                      >
-                          <Eraser className="w-6 h-6" />
-                          <span className="text-xs font-medium">Erase Object</span>
-                      </button>
-                      <button 
-                        onClick={() => setActiveTool('gen_fill')}
-                        disabled={hasUnsavedChanges}
-                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'gen_fill' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
-                      >
-                          <Sparkles className="w-6 h-6" />
-                          <span className="text-xs font-medium">Gen Fill</span>
-                      </button>
-                      <button 
-                        onClick={() => setActiveTool('blur_bg')}
-                        disabled={hasUnsavedChanges}
-                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'blur_bg' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
-                      >
-                          <Aperture className="w-6 h-6" />
-                          <span className="text-xs font-medium">Blur BG</span>
-                      </button>
-                      <button 
-                        onClick={() => setActiveTool('remove_bg')}
-                        disabled={hasUnsavedChanges}
-                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'remove_bg' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
-                      >
-                          <Layers className="w-6 h-6" />
-                          <span className="text-xs font-medium">Remove BG</span>
-                      </button>
-                       <button 
-                        onClick={() => setActiveTool('remove_fg')}
-                        disabled={hasUnsavedChanges}
-                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'remove_fg' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
-                      >
-                          <UserMinus className="w-6 h-6" />
-                          <span className="text-xs font-medium">Remove FG</span>
-                      </button>
-                       <button 
-                        onClick={() => setActiveTool('expand')}
-                        disabled={hasUnsavedChanges}
-                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'expand' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
-                      >
-                          <Maximize className="w-6 h-6" />
-                          <span className="text-xs font-medium">Expand</span>
-                      </button>
-                      <button 
-                        onClick={() => setActiveTool('advanced')}
-                        disabled={hasUnsavedChanges}
-                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'advanced' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
-                      >
-                          <FileText className="w-6 h-6" />
-                          <span className="text-xs font-medium">Details</span>
-                      </button>
-                      <button 
-                        onClick={() => setActiveTool('replace_bg')}
-                        disabled={hasUnsavedChanges}
-                        className={`p-4 col-span-2 rounded-xl border flex flex-row items-center justify-center gap-3 transition-all ${activeTool === 'replace_bg' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
-                      >
-                          <ImagePlus className="w-5 h-5" />
-                          <span className="text-xs font-medium">Replace Background</span>
-                      </button>
-                  </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto">
-                {/* Common Masking Controls */}
-                {isMaskingTool && !hasUnsavedChanges && (
-                    <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-6">
-                        <div className="p-4 bg-zinc-950/50 rounded-xl border border-zinc-800">
-                            <div className="flex justify-between mb-2">
-                                <label className="text-xs font-bold text-zinc-400 uppercase">Brush Size</label>
-                                <span className="text-xs text-zinc-500">{brushSize}px</span>
-                            </div>
-                            <input 
-                                type="range" 
-                                min="10" 
-                                max="300" 
-                                value={brushSize} 
-                                onChange={(e) => setBrushSize(parseInt(e.target.value))}
-                                className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                            />
-                            <div className="flex justify-center mt-4">
-                                <div 
-                                    className="rounded-full bg-white border border-zinc-600"
-                                    style={{ width: (brushSize * imageScale) / 2, height: (brushSize * imageScale) / 2, maxHeight: 100, maxWidth: 100 }} // Preview scaled down
-                                />
-                            </div>
-                        </div>
-
-                        {activeTool === 'gen_fill' && (
-                             <div className="space-y-2">
-                                <label className="text-xs font-bold text-zinc-400 uppercase">Prompt</label>
-                                <textarea 
-                                    value={genFillPrompt}
-                                    onChange={(e) => setGenFillPrompt(e.target.value)}
-                                    placeholder="Describe what to add in the masked area..."
-                                    className="w-full h-20 bg-zinc-950 border border-zinc-700 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none resize-none"
-                                />
-                             </div>
-                        )}
-
-                        <div className="flex gap-2">
-                            <button 
-                                    onClick={clearCanvas}
-                                    disabled={!hasMask}
-                                    className="flex-1 py-2 px-4 rounded-lg border border-zinc-700 text-zinc-400 text-sm hover:text-white hover:bg-zinc-800 disabled:opacity-50"
-                            >
-                                Clear Mask
-                            </button>
-                        </div>
-
+              {activeTool === 'advanced' ? (
+                /* Advanced Editing View */
+                <div className="flex flex-col h-full animate-in slide-in-from-right-8 fade-in duration-300">
+                    <div className="flex items-center gap-2 mb-6">
                         <button 
-                            onClick={handleApplyTool}
-                            disabled={!hasMask || isProcessing || (activeTool === 'gen_fill' && !genFillPrompt.trim())}
-                            className={`w-full py-4 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
-                                activeTool === 'gen_fill' 
-                                ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/20' 
-                                : 'bg-rose-600 hover:bg-rose-500 shadow-rose-900/20'
-                            }`}
+                            onClick={() => setActiveTool('move')} 
+                            className="p-2 -ml-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-colors"
                         >
-                            {activeTool === 'gen_fill' ? <Sparkles className="w-4 h-4" /> : <Wand2 className="w-4 h-4" />}
-                            {activeTool === 'gen_fill' ? 'Generate Fill' : 'Erase Area'}
+                            <ArrowLeft className="w-5 h-5" />
                         </button>
+                        <h3 className="text-lg font-bold text-white">Tools</h3>
                     </div>
-                )}
-                
-                {/* Remove BG Controls */}
-                {activeTool === 'remove_bg' && !hasUnsavedChanges && (
-                    <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-6">
-                        <div className="p-4 bg-zinc-950/50 rounded-xl border border-zinc-800">
-                             <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                                <Layers className="w-4 h-4 text-indigo-500" />
-                                Remove Background
-                             </h4>
-                             <p className="text-xs text-zinc-400 leading-relaxed">
-                                Automatically detect the main subject and remove the background, leaving it transparent.
-                             </p>
-                        </div>
-                        
-                        <button 
-                            onClick={handleApplyTool}
-                            disabled={isProcessing}
-                            className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20"
-                        >
-                            <Layers className="w-4 h-4" />
-                            Remove Background
-                        </button>
-                    </div>
-                )}
-
-                {/* Remove FG Controls */}
-                {activeTool === 'remove_fg' && !hasUnsavedChanges && (
-                    <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-6">
-                        <div className="p-4 bg-zinc-950/50 rounded-xl border border-zinc-800">
-                             <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                                <UserMinus className="w-4 h-4 text-indigo-500" />
-                                Remove Foreground
-                             </h4>
-                             <p className="text-xs text-zinc-400 leading-relaxed">
-                                Automatically detect and remove the main subject (foreground), leaving the background.
-                             </p>
-                        </div>
-                        
-                        <button 
-                            onClick={handleApplyTool}
-                            disabled={isProcessing}
-                            className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20"
-                        >
-                            <UserMinus className="w-4 h-4" />
-                            Remove Foreground
-                        </button>
-                    </div>
-                )}
-
-                {/* Blur BG Controls */}
-                {activeTool === 'blur_bg' && !hasUnsavedChanges && (
-                    <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-6">
-                        <div className="p-4 bg-zinc-950/50 rounded-xl border border-zinc-800">
-                             <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                                <Aperture className="w-4 h-4 text-indigo-500" />
-                                Blur Background
-                             </h4>
-                             <p className="text-xs text-zinc-400 leading-relaxed mb-4">
-                                Apply a depth-of-field effect by blurring the background while keeping the subject sharp.
-                             </p>
-                             
-                             <div className="space-y-3">
-                                <div className="flex justify-between mb-1">
-                                    <label className="text-xs font-bold text-zinc-400 uppercase">Blur Intensity</label>
-                                    <span className="text-xs text-zinc-500">{blurScale}</span>
-                                </div>
-                                <input 
-                                    type="range" 
-                                    min="1" 
-                                    max="5" 
-                                    step="1"
-                                    value={blurScale} 
-                                    onChange={(e) => setBlurScale(parseInt(e.target.value))}
-                                    className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                                />
-                                <div className="flex justify-between text-[10px] text-zinc-600 px-1">
-                                    <span>Soft</span>
-                                    <span>Strong</span>
-                                </div>
-                             </div>
-                        </div>
-                        
-                        <button 
-                            onClick={handleApplyTool}
-                            disabled={isProcessing}
-                            className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20"
-                        >
-                            <Aperture className="w-4 h-4" />
-                            Apply Blur
-                        </button>
-                    </div>
-                )}
-
-                {/* Expand Image Controls */}
-                {activeTool === 'expand' && !hasUnsavedChanges && (
-                    <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-6">
-                         <div className="p-4 bg-zinc-950/50 rounded-xl border border-zinc-800">
-                             <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                                <Maximize className="w-4 h-4 text-indigo-500" />
-                                Expand Image
-                             </h4>
-                             <p className="text-xs text-zinc-400 leading-relaxed mb-4">
-                                Extend the borders of the image to a new aspect ratio, filling the space with AI-generated content.
-                             </p>
-                             
-                             <div className="space-y-4">
-                                <div>
-                                    <label className="text-xs font-bold text-zinc-400 uppercase mb-1 block">New Aspect Ratio</label>
-                                    <select 
-                                        value={expandAspectRatio}
-                                        onChange={(e) => setExpandAspectRatio(e.target.value)}
-                                        className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-sm text-white outline-none focus:border-indigo-500"
-                                    >
-                                        {ASPECT_RATIOS.map(ratio => (
-                                            <option key={ratio} value={ratio}>{ratio}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                
-                                <div>
-                                    <label className="text-xs font-bold text-zinc-400 uppercase mb-1 block">Prompt (Optional)</label>
-                                    <textarea 
-                                        value={expandPrompt}
-                                        onChange={(e) => setExpandPrompt(e.target.value)}
-                                        placeholder="Describe the extended surroundings..."
-                                        className="w-full h-20 bg-zinc-900 border border-zinc-700 rounded p-2 text-sm text-white outline-none focus:border-indigo-500 resize-none"
-                                    />
-                                </div>
-                             </div>
-                        </div>
-                        
-                        <button 
-                            onClick={handleApplyTool}
-                            disabled={isProcessing}
-                            className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20"
-                        >
-                            <Maximize className="w-4 h-4" />
-                            Expand Image
-                        </button>
-                    </div>
-                )}
-
-                {/* Advanced Edit Controls */}
-                {activeTool === 'advanced' && !hasUnsavedChanges && (
-                    <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-6 flex flex-col h-full">
-                         <div className="p-4 bg-zinc-950/50 rounded-xl border border-zinc-800">
-                             <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                                <FileText className="w-4 h-4 text-indigo-500" />
-                                Image Details
-                             </h4>
-                             <p className="text-xs text-zinc-400 leading-relaxed mb-4">
-                                Analyze the structure and content of the generated image to reveal detailed descriptions.
-                             </p>
-                             
-                             {!advancedData ? (
+                    
+                    <div className="p-4 bg-zinc-950/50 rounded-xl border border-zinc-800 flex-1 flex flex-col overflow-hidden">
+                         <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2 flex-none">
+                            <FileText className="w-4 h-4 text-indigo-500" />
+                            Advanced Editing
+                         </h4>
+                         <p className="text-xs text-zinc-400 leading-relaxed mb-6 flex-none">
+                            Analyze the structure and content of the generated image to reveal detailed descriptions.
+                         </p>
+                         
+                         {!advancedData ? (
+                            <div className="flex-1 flex flex-col items-center justify-center">
                                 <button 
                                     onClick={handleApplyTool}
                                     disabled={isProcessing || !currentImage?.structured_prompt}
@@ -634,75 +365,360 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
                                     <Sparkles className="w-4 h-4" />
                                     Analyze Structure
                                 </button>
-                             ) : (
-                                 <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
-                                     <div>
-                                         <span className="text-xs font-bold text-zinc-500 uppercase block mb-1">Short Description</span>
-                                         <p className="text-sm text-zinc-300 bg-zinc-900/50 p-2 rounded border border-zinc-800">
-                                            {typeof advancedData.short_description === 'string' ? advancedData.short_description : JSON.stringify(advancedData.short_description)}
-                                         </p>
-                                     </div>
-                                     <div>
-                                         <span className="text-xs font-bold text-zinc-500 uppercase block mb-1">Objects</span>
-                                         <div className="space-y-2">
-                                            {Array.isArray(advancedData.objects) && advancedData.objects.map((obj: any, idx: number) => (
-                                                <div key={idx} className="text-sm text-zinc-300 bg-zinc-900/50 p-2 rounded border border-zinc-800">
-                                                    {typeof obj === 'string' ? obj : JSON.stringify(obj)}
-                                                </div>
-                                            ))}
-                                            {!Array.isArray(advancedData.objects) && (
-                                                <p className="text-sm text-zinc-300 bg-zinc-900/50 p-2 rounded border border-zinc-800">
-                                                    {JSON.stringify(advancedData.objects)}
-                                                </p>
-                                            )}
-                                         </div>
-                                     </div>
-                                     <div>
-                                         <span className="text-xs font-bold text-zinc-500 uppercase block mb-1">Background</span>
-                                         <p className="text-sm text-zinc-300 bg-zinc-900/50 p-2 rounded border border-zinc-800">
-                                             {typeof advancedData.background_setting === 'string' ? advancedData.background_setting : JSON.stringify(advancedData.background_setting)}
-                                         </p>
+                                {!currentImage?.structured_prompt && (
+                                     <p className="text-xs text-red-400 mt-4 text-center">
+                                         Structured prompt data is missing for this image.
+                                     </p>
+                                 )}
+                            </div>
+                         ) : (
+                             <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+                                 <div>
+                                     <span className="text-xs font-bold text-zinc-500 uppercase block mb-1">Short Description</span>
+                                     <p className="text-sm text-zinc-300 bg-zinc-900/50 p-2 rounded border border-zinc-800">
+                                        {typeof advancedData.short_description === 'string' ? advancedData.short_description : JSON.stringify(advancedData.short_description)}
+                                     </p>
+                                 </div>
+                                 <div>
+                                     <span className="text-xs font-bold text-zinc-500 uppercase block mb-1">Objects</span>
+                                     <div className="space-y-2">
+                                        {Array.isArray(advancedData.objects) && advancedData.objects.map((obj: any, idx: number) => (
+                                            <div key={idx} className="text-sm text-zinc-300 bg-zinc-900/50 p-2 rounded border border-zinc-800">
+                                                {typeof obj === 'string' ? obj : JSON.stringify(obj)}
+                                            </div>
+                                        ))}
+                                        {!Array.isArray(advancedData.objects) && (
+                                            <p className="text-sm text-zinc-300 bg-zinc-900/50 p-2 rounded border border-zinc-800">
+                                                {JSON.stringify(advancedData.objects)}
+                                            </p>
+                                        )}
                                      </div>
                                  </div>
-                             )}
-                             
-                             {!currentImage?.structured_prompt && (
-                                 <p className="text-xs text-red-400 mt-2">
-                                     Structured prompt data is missing for this image.
-                                 </p>
-                             )}
-                        </div>
+                                 <div>
+                                     <span className="text-xs font-bold text-zinc-500 uppercase block mb-1">Background</span>
+                                     <p className="text-sm text-zinc-300 bg-zinc-900/50 p-2 rounded border border-zinc-800">
+                                         {typeof advancedData.background_setting === 'string' ? advancedData.background_setting : JSON.stringify(advancedData.background_setting)}
+                                     </p>
+                                 </div>
+                             </div>
+                         )}
                     </div>
-                )}
+                </div>
+              ) : (
+                /* Standard Tool View */
+                <>
+                  <div>
+                      <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-4">Tools</h3>
+                      <div className="grid grid-cols-2 gap-3">
+                          <button 
+                            onClick={() => setActiveTool('move')}
+                            disabled={hasUnsavedChanges}
+                            className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'move' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
+                          >
+                              <Move className="w-6 h-6" />
+                              <span className="text-xs font-medium">View / Move</span>
+                          </button>
+                          <button 
+                            onClick={() => setActiveTool('eraser')}
+                            disabled={hasUnsavedChanges}
+                            className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'eraser' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
+                          >
+                              <Eraser className="w-6 h-6" />
+                              <span className="text-xs font-medium">Erase Object</span>
+                          </button>
+                          <button 
+                            onClick={() => setActiveTool('gen_fill')}
+                            disabled={hasUnsavedChanges}
+                            className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'gen_fill' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
+                          >
+                              <Sparkles className="w-6 h-6" />
+                              <span className="text-xs font-medium">Gen Fill</span>
+                          </button>
+                          <button 
+                            onClick={() => setActiveTool('blur_bg')}
+                            disabled={hasUnsavedChanges}
+                            className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'blur_bg' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
+                          >
+                              <Aperture className="w-6 h-6" />
+                              <span className="text-xs font-medium">Blur BG</span>
+                          </button>
+                          <button 
+                            onClick={() => setActiveTool('remove_bg')}
+                            disabled={hasUnsavedChanges}
+                            className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'remove_bg' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
+                          >
+                              <Layers className="w-6 h-6" />
+                              <span className="text-xs font-medium">Remove BG</span>
+                          </button>
+                           <button 
+                            onClick={() => setActiveTool('remove_fg')}
+                            disabled={hasUnsavedChanges}
+                            className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'remove_fg' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
+                          >
+                              <UserMinus className="w-6 h-6" />
+                              <span className="text-xs font-medium">Remove FG</span>
+                          </button>
+                           <button 
+                            onClick={() => setActiveTool('expand')}
+                            disabled={hasUnsavedChanges}
+                            className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'expand' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
+                          >
+                              <Maximize className="w-6 h-6" />
+                              <span className="text-xs font-medium">Expand</span>
+                          </button>
+                          <button 
+                            onClick={() => setActiveTool('replace_bg')}
+                            disabled={hasUnsavedChanges}
+                            className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'replace_bg' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
+                          >
+                              <ImagePlus className="w-6 h-6" />
+                              <span className="text-xs font-medium">Replace BG</span>
+                          </button>
 
-                {/* Replace BG Controls */}
-                {activeTool === 'replace_bg' && !hasUnsavedChanges && (
-                    <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-6 flex flex-col h-full">
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-xs font-bold text-zinc-400 uppercase mb-2 block">New Background Prompt</label>
-                                <textarea 
-                                    value={replaceBgPrompt}
-                                    onChange={(e) => setReplaceBgPrompt(e.target.value)}
-                                    placeholder="e.g. A futuristic city skyline at night..."
-                                    className="w-full h-32 bg-zinc-950 border border-zinc-700 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none resize-none"
+                          <button 
+                            onClick={() => setActiveTool('advanced')}
+                            disabled={hasUnsavedChanges}
+                            className={`p-4 col-span-2 rounded-xl border flex flex-row items-center justify-center gap-3 transition-all ${activeTool === 'advanced' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
+                          >
+                              <FileText className="w-5 h-5" />
+                              <span className="text-xs font-medium">Advanced Editing</span>
+                          </button>
+                      </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto">
+                    {/* Common Masking Controls */}
+                    {isMaskingTool && !hasUnsavedChanges && (
+                        <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-6">
+                            <div className="p-4 bg-zinc-950/50 rounded-xl border border-zinc-800">
+                                <div className="flex justify-between mb-2">
+                                    <label className="text-xs font-bold text-zinc-400 uppercase">Brush Size</label>
+                                    <span className="text-xs text-zinc-500">{brushSize}px</span>
+                                </div>
+                                <input 
+                                    type="range" 
+                                    min="10" 
+                                    max="300" 
+                                    value={brushSize} 
+                                    onChange={(e) => setBrushSize(parseInt(e.target.value))}
+                                    className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                                 />
+                                <div className="flex justify-center mt-4">
+                                    <div 
+                                        className="rounded-full bg-white border border-zinc-600"
+                                        style={{ width: (brushSize * imageScale) / 2, height: (brushSize * imageScale) / 2, maxHeight: 100, maxWidth: 100 }} // Preview scaled down
+                                    />
+                                </div>
                             </div>
-                        </div>
 
-                        <div className="mt-4 pt-4 border-t border-zinc-800">
-                             <button 
+                            {activeTool === 'gen_fill' && (
+                                 <div className="space-y-2">
+                                    <label className="text-xs font-bold text-zinc-400 uppercase">Prompt</label>
+                                    <textarea 
+                                        value={genFillPrompt}
+                                        onChange={(e) => setGenFillPrompt(e.target.value)}
+                                        placeholder="Describe what to add in the masked area..."
+                                        className="w-full h-20 bg-zinc-950 border border-zinc-700 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none resize-none"
+                                    />
+                                 </div>
+                            )}
+
+                            <div className="flex gap-2">
+                                <button 
+                                        onClick={clearCanvas}
+                                        disabled={!hasMask}
+                                        className="flex-1 py-2 px-4 rounded-lg border border-zinc-700 text-zinc-400 text-sm hover:text-white hover:bg-zinc-800 disabled:opacity-50"
+                                >
+                                    Clear Mask
+                                </button>
+                            </div>
+
+                            <button 
                                 onClick={handleApplyTool}
-                                disabled={isProcessing || !replaceBgPrompt.trim()}
-                                className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20"
+                                disabled={!hasMask || isProcessing || (activeTool === 'gen_fill' && !genFillPrompt.trim())}
+                                className={`w-full py-4 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
+                                    activeTool === 'gen_fill' 
+                                    ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/20' 
+                                    : 'bg-rose-600 hover:bg-rose-500 shadow-rose-900/20'
+                                }`}
                             >
-                                <ImagePlus className="w-4 h-4" />
-                                Replace Background
+                                {activeTool === 'gen_fill' ? <Sparkles className="w-4 h-4" /> : <Wand2 className="w-4 h-4" />}
+                                {activeTool === 'gen_fill' ? 'Generate Fill' : 'Erase Area'}
                             </button>
                         </div>
-                    </div>
-                )}
-              </div>
+                    )}
+                    
+                    {/* Remove BG Controls */}
+                    {activeTool === 'remove_bg' && !hasUnsavedChanges && (
+                        <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-6">
+                            <div className="p-4 bg-zinc-950/50 rounded-xl border border-zinc-800">
+                                 <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                                    <Layers className="w-4 h-4 text-indigo-500" />
+                                    Remove Background
+                                 </h4>
+                                 <p className="text-xs text-zinc-400 leading-relaxed">
+                                    Automatically detect the main subject and remove the background, leaving it transparent.
+                                 </p>
+                            </div>
+                            
+                            <button 
+                                onClick={handleApplyTool}
+                                disabled={isProcessing}
+                                className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20"
+                            >
+                                <Layers className="w-4 h-4" />
+                                Remove Background
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Remove FG Controls */}
+                    {activeTool === 'remove_fg' && !hasUnsavedChanges && (
+                        <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-6">
+                            <div className="p-4 bg-zinc-950/50 rounded-xl border border-zinc-800">
+                                 <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                                    <UserMinus className="w-4 h-4 text-indigo-500" />
+                                    Remove Foreground
+                                 </h4>
+                                 <p className="text-xs text-zinc-400 leading-relaxed">
+                                    Automatically detect and remove the main subject (foreground), leaving the background.
+                                 </p>
+                            </div>
+                            
+                            <button 
+                                onClick={handleApplyTool}
+                                disabled={isProcessing}
+                                className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20"
+                            >
+                                <UserMinus className="w-4 h-4" />
+                                Remove Foreground
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Blur BG Controls */}
+                    {activeTool === 'blur_bg' && !hasUnsavedChanges && (
+                        <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-6">
+                            <div className="p-4 bg-zinc-950/50 rounded-xl border border-zinc-800">
+                                 <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                                    <Aperture className="w-4 h-4 text-indigo-500" />
+                                    Blur Background
+                                 </h4>
+                                 <p className="text-xs text-zinc-400 leading-relaxed mb-4">
+                                    Apply a depth-of-field effect by blurring the background while keeping the subject sharp.
+                                 </p>
+                                 
+                                 <div className="space-y-3">
+                                    <div className="flex justify-between mb-1">
+                                        <label className="text-xs font-bold text-zinc-400 uppercase">Blur Intensity</label>
+                                        <span className="text-xs text-zinc-500">{blurScale}</span>
+                                    </div>
+                                    <input 
+                                        type="range" 
+                                        min="1" 
+                                        max="5" 
+                                        step="1"
+                                        value={blurScale} 
+                                        onChange={(e) => setBlurScale(parseInt(e.target.value))}
+                                        className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                                    />
+                                    <div className="flex justify-between text-[10px] text-zinc-600 px-1">
+                                        <span>Soft</span>
+                                        <span>Strong</span>
+                                    </div>
+                                 </div>
+                            </div>
+                            
+                            <button 
+                                onClick={handleApplyTool}
+                                disabled={isProcessing}
+                                className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20"
+                            >
+                                <Aperture className="w-4 h-4" />
+                                Apply Blur
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Expand Image Controls */}
+                    {activeTool === 'expand' && !hasUnsavedChanges && (
+                        <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-6">
+                             <div className="p-4 bg-zinc-950/50 rounded-xl border border-zinc-800">
+                                 <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                                    <Maximize className="w-4 h-4 text-indigo-500" />
+                                    Expand Image
+                                 </h4>
+                                 <p className="text-xs text-zinc-400 leading-relaxed mb-4">
+                                    Extend the borders of the image to a new aspect ratio, filling the space with AI-generated content.
+                                 </p>
+                                 
+                                 <div className="space-y-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-zinc-400 uppercase mb-1 block">New Aspect Ratio</label>
+                                        <select 
+                                            value={expandAspectRatio}
+                                            onChange={(e) => setExpandAspectRatio(e.target.value)}
+                                            className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-sm text-white outline-none focus:border-indigo-500"
+                                        >
+                                            {ASPECT_RATIOS.map(ratio => (
+                                                <option key={ratio} value={ratio}>{ratio}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="text-xs font-bold text-zinc-400 uppercase mb-1 block">Prompt (Optional)</label>
+                                        <textarea 
+                                            value={expandPrompt}
+                                            onChange={(e) => setExpandPrompt(e.target.value)}
+                                            placeholder="Describe the extended surroundings..."
+                                            className="w-full h-20 bg-zinc-900 border border-zinc-700 rounded p-2 text-sm text-white outline-none focus:border-indigo-500 resize-none"
+                                        />
+                                    </div>
+                                 </div>
+                            </div>
+                            
+                            <button 
+                                onClick={handleApplyTool}
+                                disabled={isProcessing}
+                                className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20"
+                            >
+                                <Maximize className="w-4 h-4" />
+                                Expand Image
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Replace BG Controls */}
+                    {activeTool === 'replace_bg' && !hasUnsavedChanges && (
+                        <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-6 flex flex-col h-full">
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-zinc-400 uppercase mb-2 block">New Background Prompt</label>
+                                    <textarea 
+                                        value={replaceBgPrompt}
+                                        onChange={(e) => setReplaceBgPrompt(e.target.value)}
+                                        placeholder="e.g. A futuristic city skyline at night..."
+                                        className="w-full h-32 bg-zinc-950 border border-zinc-700 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none resize-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="mt-4 pt-4 border-t border-zinc-800">
+                                 <button 
+                                    onClick={handleApplyTool}
+                                    disabled={isProcessing || !replaceBgPrompt.trim()}
+                                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20"
+                                >
+                                    <ImagePlus className="w-4 h-4" />
+                                    Replace Background
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                  </div>
+                </>
+              )}
 
               {/* Save / Discard Actions */}
               {hasUnsavedChanges && (
