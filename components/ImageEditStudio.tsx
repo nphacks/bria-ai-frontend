@@ -269,29 +269,76 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
   };
 
   const handleRegenerateFromAdvanced = async () => {
-      if (!currentImage) return;
+      if (!currentImage || !advancedData) return;
       
       setPreRegenerationImage(currentImage); // Snapshot state
       setIsProcessing(true);
       
       try {
-          // Construct full prompt from edited data
-          const promptParts = Object.entries(editedData)
-              .filter(([_, v]) => v && (Array.isArray(v) ? v.length > 0 : v.trim()))
-              .map(([k, v]) => {
-                  if (Array.isArray(v)) {
-                      return `${formatKey(k)}:\n${v.join('\n')}`;
+          const changedParts: string[] = [];
+
+          // Compare editedData with advancedData
+          Object.entries(editedData).forEach(([key, currentValue]) => {
+              const originalValueRaw = advancedData[key];
+              
+              // Normalize original value to match editedData structure for comparison
+              let originalValueNormalized: string | string[];
+              if (Array.isArray(originalValueRaw)) {
+                  originalValueNormalized = originalValueRaw.map(item => typeof item === 'string' ? item : JSON.stringify(item));
+              } else if (typeof originalValueRaw === 'string') {
+                  originalValueNormalized = originalValueRaw;
+              } else {
+                  originalValueNormalized = JSON.stringify(originalValueRaw, null, 2);
+              }
+
+              let hasChanged = false;
+              if (Array.isArray(currentValue)) {
+                  // Compare arrays
+                  if (!Array.isArray(originalValueNormalized)) {
+                      hasChanged = true;
+                  } else {
+                      if (currentValue.length !== originalValueNormalized.length) {
+                          hasChanged = true;
+                      } else {
+                           // Compare elements
+                           for (let i = 0; i < currentValue.length; i++) {
+                               if (currentValue[i] !== originalValueNormalized[i]) {
+                                   hasChanged = true;
+                                   break;
+                               }
+                           }
+                      }
                   }
-                  return `${formatKey(k)}: ${v.trim()}`;
-              });
+                  
+                  if (hasChanged) {
+                      // For arrays, we send the key and the new list joined by newlines
+                      changedParts.push(`${formatKey(key)}:\n${currentValue.join('\n')}`);
+                  }
+
+              } else {
+                  // Compare strings
+                  if (currentValue !== originalValueNormalized) {
+                      hasChanged = true;
+                      changedParts.push(`${formatKey(key)}: ${currentValue.trim()}`);
+                  }
+              }
+          });
           
           if (additionalPrompt.trim()) {
-              promptParts.push(`Additional Instructions: ${additionalPrompt.trim()}`);
+              changedParts.push(`Additional Instructions: ${additionalPrompt.trim()}`);
           }
 
-          const fullPrompt = promptParts.join('\n\n');
+          if (changedParts.length === 0) {
+              alert("No changes detected. Please modify fields or add instructions.");
+              setIsProcessing(false);
+              setPreRegenerationImage(null);
+              return;
+          }
+
+          const fullPrompt = changedParts.join('\n\n');
           
-          // Generate new image using the reference + new prompt
+          // Generate new image using the reference + new prompt.
+          // By passing [currentImage], we ensure the structured_prompt is sent to the backend.
           const result = await generateImage(fullPrompt, [currentImage]);
           setCurrentImage(result);
           
