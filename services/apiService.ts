@@ -53,7 +53,9 @@ export const generateImage = async (prompt: string, referenceImages?: (string | 
       referenceImages.forEach(ref => {
         if (typeof ref === 'string') {
           // External image (base64 or url)
-          images.push(ref);
+          // Strip data URI prefix if present (for uploaded images)
+          const cleanRef = ref.replace(/^data:image\/\w+;base64,/, "");
+          images.push(cleanRef);
         } else {
           // Bria GeneratedImage object
           images.push(ref.image_url);
