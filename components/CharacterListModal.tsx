@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CharacterProfile, ArtStyle, GeneratedImage } from '../types';
-import { Users, X, ChevronLeft, ImageIcon, Sparkles, Loader2, Wand2, CheckCircle2, User, Edit2 } from 'lucide-react';
+import { Users, X, ChevronLeft, ImageIcon, Sparkles, Loader2, Wand2, CheckCircle2, User, Edit2, Trash2 } from 'lucide-react';
 import { generateImage } from '../services/apiService';
 
 interface CharacterListModalProps {
@@ -87,6 +87,24 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
         alert("Failed to generate image variation.");
     } finally {
         setIsGeneratingNew(false);
+    }
+  };
+
+  const handleDeleteImage = (imgUrl: string) => {
+    if (!activeCharacter) return;
+    if (window.confirm("Are you sure you want to delete this image?")) {
+        const updatedPortraits = activeCharacter.generatedPortraits.filter(p => p.image_url !== imgUrl);
+        
+        // Update character
+        onUpdateCharacter({
+            ...activeCharacter,
+            generatedPortraits: updatedPortraits
+        });
+
+        // Remove from local selection state if it was selected
+        if (selectedReferenceUrls.includes(imgUrl)) {
+            setSelectedReferenceUrls(prev => prev.filter(u => u !== imgUrl));
+        }
     }
   };
 
@@ -222,27 +240,40 @@ export const CharacterListModal: React.FC<CharacterListModalProps> = ({
                                          >
                                              <img src={imgUrl} alt="" className="w-full h-full object-cover" />
                                              {isSelected && (
-                                                 <div className="absolute top-2 right-2 bg-emerald-500 text-black rounded-full p-1 shadow-lg">
+                                                 <div className="absolute top-2 right-2 bg-emerald-500 text-black rounded-full p-1 shadow-lg z-10">
                                                      <CheckCircle2 className="w-4 h-4" />
                                                  </div>
                                              )}
                                              {!isSelected && (
-                                                 <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                 <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                                                      <span className="text-xs bg-black/70 px-2 py-1 rounded text-white">Use as Ref</span>
                                                  </div>
                                              )}
                                              
-                                             {/* Edit Button */}
-                                             <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onNavigateToEditStudio(img);
-                                                }}
-                                                className="absolute bottom-2 right-2 bg-zinc-800 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-all hover:scale-110 hover:bg-indigo-600 z-10 border border-zinc-700"
-                                                title="Edit in Studio"
-                                             >
-                                                <Edit2 className="w-3 h-3" />
-                                             </button>
+                                             <div className="absolute bottom-2 right-2 flex gap-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                 {/* Delete Button */}
+                                                 <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteImage(imgUrl);
+                                                    }}
+                                                    className="bg-zinc-800 text-white p-1.5 rounded-full hover:scale-110 hover:bg-red-600 border border-zinc-700"
+                                                    title="Delete Image"
+                                                 >
+                                                    <Trash2 className="w-3 h-3" />
+                                                 </button>
+                                                 {/* Edit Button */}
+                                                 <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onNavigateToEditStudio(img);
+                                                    }}
+                                                    className="bg-zinc-800 text-white p-1.5 rounded-full hover:scale-110 hover:bg-indigo-600 border border-zinc-700"
+                                                    title="Edit in Studio"
+                                                 >
+                                                    <Edit2 className="w-3 h-3" />
+                                                 </button>
+                                             </div>
                                          </div>
                                      );
                                  })}
