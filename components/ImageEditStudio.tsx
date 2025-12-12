@@ -52,9 +52,10 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
   
   // Advanced Edit State
   const [advancedData, setAdvancedData] = useState<any | null>(null);
-  const [editedData, setEditedData] = useState<Record<string, string>>({});
+  const [editedData, setEditedData] = useState<Record<string, string | string[]>>({});
   const [additionalPrompt, setAdditionalPrompt] = useState('');
   const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({});
+  const [preRegenerationImage, setPreRegenerationImage] = useState<GeneratedImage | null>(null);
 
   // Canvas & Image Refs
   const containerRef = useRef<HTMLDivElement>(null);
@@ -79,6 +80,7 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
     setAdvancedData(null);
     setEditedData({});
     setAdditionalPrompt('');
+    setPreRegenerationImage(null);
   }, [initialImage]);
 
   // Initialize canvas size to match image natural size once image loads
@@ -106,19 +108,19 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
   // Initialize edited data when analysis completes
   useEffect(() => {
     if (advancedData) {
-        const initial: Record<string, string> = {};
+        const initial: Record<string, string | string[]> = {};
         const initialExpanded: Record<string, boolean> = {};
         
         Object.entries(advancedData).forEach(([k, v]) => {
             if (Array.isArray(v)) {
-                initial[k] = v.map(item => typeof item === 'string' ? item : JSON.stringify(item)).join('\n\n');
+                initial[k] = v.map(item => typeof item === 'string' ? item : JSON.stringify(item));
             } else if (typeof v === 'string') {
                 initial[k] = v;
             } else {
                 initial[k] = JSON.stringify(v, null, 2);
             }
-            // Auto expand short fields
-            initialExpanded[k] = initial[k].length < 100;
+            // Auto expand logic
+            initialExpanded[k] = Array.isArray(v) || (typeof initial[k] === 'string' && initial[k].length < 100);
         });
         setEditedData(initial);
         setExpandedKeys(initialExpanded);
@@ -268,12 +270,20 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
 
   const handleRegenerateFromAdvanced = async () => {
       if (!currentImage) return;
+      
+      setPreRegenerationImage(currentImage); // Snapshot state
       setIsProcessing(true);
+      
       try {
           // Construct full prompt from edited data
           const promptParts = Object.entries(editedData)
-              .filter(([_, v]) => v && v.trim())
-              .map(([k, v]) => `${formatKey(k)}: ${v.trim()}`);
+              .filter(([_, v]) => v && (Array.isArray(v) ? v.length > 0 : v.trim()))
+              .map(([k, v]) => {
+                  if (Array.isArray(v)) {
+                      return `${formatKey(k)}:\n${v.join('\n')}`;
+                  }
+                  return `${formatKey(k)}: ${v.trim()}`;
+              });
           
           if (additionalPrompt.trim()) {
               promptParts.push(`Additional Instructions: ${additionalPrompt.trim()}`);
@@ -282,15 +292,26 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
           const fullPrompt = promptParts.join('\n\n');
           
           // Generate new image using the reference + new prompt
-          // We pass the current image as reference to maintain composition/identity
           const result = await generateImage(fullPrompt, [currentImage]);
           setCurrentImage(result);
           
       } catch (error) {
           console.error("Regeneration failed", error);
           alert("Failed to regenerate image.");
+          setPreRegenerationImage(null); // Revert state tracking on error
       } finally {
           setIsProcessing(false);
+      }
+  };
+
+  const acceptVariation = () => {
+      setPreRegenerationImage(null);
+  };
+
+  const discardVariation = () => {
+      if (preRegenerationImage) {
+          setCurrentImage(preRegenerationImage);
+          setPreRegenerationImage(null);
       }
   };
 
@@ -307,6 +328,39 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
 
   const toggleExpandKey = (key: string) => {
       setExpandedKeys(prev => ({...prev, [key]: !prev[key]}));
+  };
+  
+  const handleArrayUpdate = (key: string, index: number, newValue: string) => {
+    setEditedData(prev => {
+        const current = prev[key];
+        if (Array.isArray(current)) {
+            const next = [...current];
+            next[index] = newValue;
+            return { ...prev, [key]: next };
+        }
+        return prev;
+    });
+  };
+
+  const handleAddArrayItem = (key: string) => {
+    setEditedData(prev => {
+        const current = prev[key];
+        if (Array.isArray(current)) {
+            return { ...prev, [key]: [...current, ''] };
+        }
+        return prev;
+    });
+  };
+
+  const handleDeleteArrayItem = (key: string, index: number) => {
+    setEditedData(prev => {
+        const current = prev[key];
+        if (Array.isArray(current)) {
+            const next = current.filter((_, i) => i !== index);
+            return { ...prev, [key]: next };
+        }
+        return prev;
+    });
   };
 
   if (!initialImage) return null;
@@ -447,6 +501,8 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
 
                                 {Object.entries(editedData).map(([key, value]) => {
                                     const isExpanded = expandedKeys[key];
+                                    const isArray = Array.isArray(value);
+
                                     return (
                                         <div key={key} className="bg-zinc-950 border border-zinc-800 rounded-lg overflow-hidden transition-all hover:border-zinc-700">
                                             <button 
@@ -458,6 +514,7 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
                                                     <span className="text-xs font-bold text-zinc-300 uppercase tracking-wide">
                                                         {formatKey(key)}
                                                     </span>
+                                                    {isArray && <span className="bg-zinc-800 text-zinc-500 text-[10px] px-1.5 rounded">{value.length}</span>}
                                                 </div>
                                                 <div className="text-zinc-500">
                                                     {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -465,13 +522,39 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
                                             </button>
                                             
                                             {isExpanded && (
-                                                <div className="p-2 bg-black">
-                                                    <textarea 
-                                                        value={value}
-                                                        onChange={(e) => setEditedData(prev => ({...prev, [key]: e.target.value}))}
-                                                        className="w-full bg-zinc-900 text-sm text-zinc-300 p-3 rounded border border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-y min-h-[100px] leading-relaxed"
-                                                        placeholder={`Describe ${formatKey(key)}...`}
-                                                    />
+                                                <div className="p-2 bg-black border-t border-zinc-800/50">
+                                                    {isArray ? (
+                                                        <div className="space-y-2">
+                                                            {value.map((item, idx) => (
+                                                                <div key={idx} className="flex gap-2 items-start group">
+                                                                    <textarea 
+                                                                        value={item}
+                                                                        onChange={(e) => handleArrayUpdate(key, idx, e.target.value)}
+                                                                        className="flex-1 bg-zinc-900 text-sm text-zinc-300 p-2 rounded border border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-y min-h-[60px]"
+                                                                    />
+                                                                    <button 
+                                                                        onClick={() => handleDeleteArrayItem(key, idx)}
+                                                                        className="p-1.5 text-zinc-600 hover:text-red-400 bg-zinc-900 hover:bg-zinc-800 rounded border border-zinc-800 mt-1"
+                                                                    >
+                                                                        <Trash2 className="w-3 h-3" />
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                            <button 
+                                                                onClick={() => handleAddArrayItem(key)}
+                                                                className="w-full py-2 flex items-center justify-center gap-1 text-xs text-zinc-500 hover:text-indigo-400 hover:bg-zinc-900/50 rounded border border-dashed border-zinc-800 hover:border-indigo-900 transition-colors"
+                                                            >
+                                                                <Plus className="w-3 h-3" /> Add Item
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <textarea 
+                                                            value={value as string}
+                                                            onChange={(e) => setEditedData(prev => ({...prev, [key]: e.target.value}))}
+                                                            className="w-full bg-zinc-900 text-sm text-zinc-300 p-3 rounded border border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-y min-h-[100px] leading-relaxed"
+                                                            placeholder={`Describe ${formatKey(key)}...`}
+                                                        />
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
@@ -493,14 +576,37 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
 
                              {/* Sticky Bottom Actions */}
                              <div className="pt-4 mt-auto border-t border-zinc-800 bg-zinc-900 z-10">
-                                 <button 
-                                     onClick={handleRegenerateFromAdvanced}
-                                     disabled={isProcessing}
-                                     className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20 transition-all hover:scale-[1.01]"
-                                 >
-                                     {isProcessing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                                     Generate Variation
-                                 </button>
+                                 {preRegenerationImage ? (
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between text-xs text-zinc-400 px-1">
+                                            <span>Variation Generated</span>
+                                            <span className="text-indigo-400">Previewing...</span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button 
+                                                onClick={acceptVariation}
+                                                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg"
+                                            >
+                                                <Check className="w-4 h-4" /> Keep Variation
+                                            </button>
+                                            <button 
+                                                onClick={discardVariation}
+                                                className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl font-bold flex items-center justify-center gap-2"
+                                            >
+                                                <Undo2 className="w-4 h-4" /> Discard
+                                            </button>
+                                        </div>
+                                    </div>
+                                 ) : (
+                                     <button 
+                                         onClick={handleRegenerateFromAdvanced}
+                                         disabled={isProcessing}
+                                         className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20 transition-all hover:scale-[1.01]"
+                                     >
+                                         {isProcessing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                                         Generate Variation
+                                     </button>
+                                 )}
                              </div>
                         </div>
                     )}
@@ -822,7 +928,7 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
               )}
 
               {/* Save / Discard Actions */}
-              {hasUnsavedChanges && (
+              {hasUnsavedChanges && !preRegenerationImage && (
                   <div className="mt-auto border-t border-zinc-800 pt-6 animate-in slide-in-from-bottom-4 fade-in duration-300">
                       <div className="bg-zinc-800/50 rounded-xl p-4 border border-zinc-700 mb-4">
                           <h4 className="text-sm font-bold text-white mb-1">Unsaved Changes</h4>
