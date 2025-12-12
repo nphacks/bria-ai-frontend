@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { ScriptElement, ScriptElementType } from '../types';
-import { Trash2, ArrowDown, Camera } from 'lucide-react';
+import { Trash2, ArrowUp, Camera } from 'lucide-react';
 
 interface ScreenplayEditorProps {
   elements: ScriptElement[];
@@ -182,7 +182,7 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
               disabled={!currentInput.trim()}
               className="absolute right-3 bottom-3 p-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-white transition-colors"
             >
-              <ArrowDown className="w-5 h-5" />
+              <ArrowUp className="w-5 h-5" />
             </button>
           </div>
           
