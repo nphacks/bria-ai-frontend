@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { ArrowLeft, Wand2, Eraser, Move, Undo2, Download, RefreshCw, Layers, Check, X, Sparkles, ImagePlus, Aperture, UserMinus, Maximize, FileText, Palette, Sun, Box, BookOpen, PenTool, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { GeneratedImage } from '../types';
 import { eraseImage, generativeFill, removeBackground, replaceBackground, blurBackground, removeForeground, expandImage, generateFullDescriptions, generateImage } from '../services/apiService';
@@ -46,7 +46,7 @@ const AutoResizeTextarea = ({
 }) => {
     const ref = useRef<HTMLTextAreaElement>(null);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (ref.current) {
             // Reset height to auto to correctly calculate shrink
             ref.current.style.height = 'auto';

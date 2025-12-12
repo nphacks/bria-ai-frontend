@@ -68,19 +68,21 @@ const App: React.FC = () => {
   };
 
   const handleSaveEditedImage = (originalImage: GeneratedImage, newImage: GeneratedImage) => {
-    let processedNewImage = { ...newImage };
+    // Clone new image to avoid reference issues
+    const processedNewImage = { ...newImage };
     
-    // Normalize URLs for comparison to handle existing timestamps or parameters
+    // Normalize URLs by stripping query params (like timestamps)
     const originalBase = originalImage.image_url.split('?')[0];
     const newBase = newImage.image_url.split('?')[0];
 
-    // If the base URL is the same, we MUST append a new timestamp to force a browser refresh
-    // This handles cases where the backend overwrites the file or returns the same filename
+    // Cache Busting:
+    // If the backend returned the exact same filename (e.g. overwrite), we append a timestamp.
+    // If the backend returned a new filename (e.g. advanced remix), we use it as is.
     if (originalBase === newBase) {
         processedNewImage.image_url = `${newBase}?t=${Date.now()}`;
     }
 
-    const targetUrl = originalImage.image_url;
+    // We search for items matching the ORIGINAL base URL to replace them.
     const targetBase = originalBase;
 
     // Update Characters
@@ -116,6 +118,7 @@ const App: React.FC = () => {
     });
 
     // Update the currently selected image reference so the UI reflects the save immediately
+    // This is crucial for keeping the Studio in sync if the user stays in it
     setSelectedImageForEdit(processedNewImage);
   };
 
