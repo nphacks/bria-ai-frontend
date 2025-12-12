@@ -331,7 +331,7 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
           </div>
 
           {/* Right Toolbar */}
-          <div className="w-96 border-l border-zinc-800 bg-zinc-900 p-6 flex flex-col gap-6 z-20 shadow-xl">
+          <div className="w-[500px] border-l border-zinc-800 bg-zinc-900 p-6 flex flex-col gap-6 z-20 shadow-xl">
               
               {activeTool === 'advanced' ? (
                 /* Advanced Editing View */
