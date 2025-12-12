@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Wand2, Eraser, Move, Undo2, Download, RefreshCw, Layers, Check, X, Sparkles, ImagePlus, Aperture, UserMinus, Maximize } from 'lucide-react';
+import { ArrowLeft, Wand2, Eraser, Move, Undo2, Download, RefreshCw, Layers, Check, X, Sparkles, ImagePlus, Aperture, UserMinus, Maximize, FileText } from 'lucide-react';
 import { GeneratedImage } from '../types';
-import { eraseImage, generativeFill, removeBackground, replaceBackground, blurBackground, removeForeground, expandImage } from '../services/apiService';
+import { eraseImage, generativeFill, removeBackground, replaceBackground, blurBackground, removeForeground, expandImage, generateFullDescriptions } from '../services/apiService';
 
 interface ImageEditStudioProps {
   image: GeneratedImage | null;
@@ -18,7 +18,7 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
 }) => {
   const [currentImage, setCurrentImage] = useState<GeneratedImage | null>(initialImage);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTool, setActiveTool] = useState<'move' | 'eraser' | 'gen_fill' | 'remove_bg' | 'replace_bg' | 'blur_bg' | 'remove_fg' | 'expand'>('move');
+  const [activeTool, setActiveTool] = useState<'move' | 'eraser' | 'gen_fill' | 'remove_bg' | 'replace_bg' | 'blur_bg' | 'remove_fg' | 'expand' | 'advanced'>('move');
   const [brushSize, setBrushSize] = useState(50);
   const [genFillPrompt, setGenFillPrompt] = useState('');
   
@@ -32,6 +32,9 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
   const [expandAspectRatio, setExpandAspectRatio] = useState('16:9');
   const [expandPrompt, setExpandPrompt] = useState('');
   
+  // Advanced Edit State
+  const [advancedData, setAdvancedData] = useState<any | null>(null);
+
   // Canvas & Image Refs
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -51,6 +54,8 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
     setCurrentImage(initialImage);
     // When image changes (e.g. save or discard), clear canvas
     clearCanvas();
+    // Reset advanced data on new image
+    setAdvancedData(null);
   }, [initialImage]);
 
   // Initialize canvas size to match image natural size once image loads
@@ -192,6 +197,16 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
             result = await replaceBackground(currentImage.image_url, replaceBgPrompt);
         } else if (activeTool === 'expand') {
             result = await expandImage(currentImage.image_url, expandAspectRatio, expandPrompt);
+        } else if (activeTool === 'advanced') {
+            if (!currentImage.structured_prompt) {
+                alert("No structured data available for this image.");
+                setIsProcessing(false);
+                return;
+            }
+            const data = await generateFullDescriptions(currentImage.structured_prompt);
+            setAdvancedData(data);
+            setIsProcessing(false);
+            return; // Don't replace current image
         } else {
             return;
         }
@@ -377,12 +392,20 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
                           <span className="text-xs font-medium">Expand</span>
                       </button>
                       <button 
+                        onClick={() => setActiveTool('advanced')}
+                        disabled={hasUnsavedChanges}
+                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'advanced' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
+                      >
+                          <FileText className="w-6 h-6" />
+                          <span className="text-xs font-medium">Details</span>
+                      </button>
+                      <button 
                         onClick={() => setActiveTool('replace_bg')}
                         disabled={hasUnsavedChanges}
-                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeTool === 'replace_bg' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
+                        className={`p-4 col-span-2 rounded-xl border flex flex-row items-center justify-center gap-3 transition-all ${activeTool === 'replace_bg' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
                       >
-                          <ImagePlus className="w-6 h-6" />
-                          <span className="text-xs font-medium">Replace BG</span>
+                          <ImagePlus className="w-5 h-5" />
+                          <span className="text-xs font-medium">Replace Background</span>
                       </button>
                   </div>
               </div>
@@ -587,6 +610,68 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
                             <Maximize className="w-4 h-4" />
                             Expand Image
                         </button>
+                    </div>
+                )}
+
+                {/* Advanced Edit Controls */}
+                {activeTool === 'advanced' && !hasUnsavedChanges && (
+                    <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-6 flex flex-col h-full">
+                         <div className="p-4 bg-zinc-950/50 rounded-xl border border-zinc-800">
+                             <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-indigo-500" />
+                                Image Details
+                             </h4>
+                             <p className="text-xs text-zinc-400 leading-relaxed mb-4">
+                                Analyze the structure and content of the generated image to reveal detailed descriptions.
+                             </p>
+                             
+                             {!advancedData ? (
+                                <button 
+                                    onClick={handleApplyTool}
+                                    disabled={isProcessing || !currentImage?.structured_prompt}
+                                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20"
+                                >
+                                    <Sparkles className="w-4 h-4" />
+                                    Analyze Structure
+                                </button>
+                             ) : (
+                                 <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                                     <div>
+                                         <span className="text-xs font-bold text-zinc-500 uppercase block mb-1">Short Description</span>
+                                         <p className="text-sm text-zinc-300 bg-zinc-900/50 p-2 rounded border border-zinc-800">
+                                            {typeof advancedData.short_description === 'string' ? advancedData.short_description : JSON.stringify(advancedData.short_description)}
+                                         </p>
+                                     </div>
+                                     <div>
+                                         <span className="text-xs font-bold text-zinc-500 uppercase block mb-1">Objects</span>
+                                         <div className="space-y-2">
+                                            {Array.isArray(advancedData.objects) && advancedData.objects.map((obj: any, idx: number) => (
+                                                <div key={idx} className="text-sm text-zinc-300 bg-zinc-900/50 p-2 rounded border border-zinc-800">
+                                                    {typeof obj === 'string' ? obj : JSON.stringify(obj)}
+                                                </div>
+                                            ))}
+                                            {!Array.isArray(advancedData.objects) && (
+                                                <p className="text-sm text-zinc-300 bg-zinc-900/50 p-2 rounded border border-zinc-800">
+                                                    {JSON.stringify(advancedData.objects)}
+                                                </p>
+                                            )}
+                                         </div>
+                                     </div>
+                                     <div>
+                                         <span className="text-xs font-bold text-zinc-500 uppercase block mb-1">Background</span>
+                                         <p className="text-sm text-zinc-300 bg-zinc-900/50 p-2 rounded border border-zinc-800">
+                                             {typeof advancedData.background_setting === 'string' ? advancedData.background_setting : JSON.stringify(advancedData.background_setting)}
+                                         </p>
+                                     </div>
+                                 </div>
+                             )}
+                             
+                             {!currentImage?.structured_prompt && (
+                                 <p className="text-xs text-red-400 mt-2">
+                                     Structured prompt data is missing for this image.
+                                 </p>
+                             )}
+                        </div>
                     </div>
                 )}
 

@@ -364,3 +364,27 @@ export const expandImage = async (imageUrl: string, aspectRatio?: string, prompt
     throw error;
   }
 };
+
+export const generateFullDescriptions = async (structuredPrompt: any): Promise<any> => {
+  try {
+    const response = await fetch('http://localhost:8000/edit/generate_full_descriptions/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        structured_prompt: structuredPrompt
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Backend error (${response.status}): ${errorText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Generate full descriptions failed:', error);
+    throw error;
+  }
+};
