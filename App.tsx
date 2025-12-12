@@ -68,28 +68,54 @@ const App: React.FC = () => {
   };
 
   const handleSaveEditedImage = (originalImage: GeneratedImage, newImage: GeneratedImage) => {
+    // Ensure we force a refresh if the URL is identical (cache busting)
+    let processedNewImage = { ...newImage };
+    if (originalImage.image_url === newImage.image_url) {
+        // Append a timestamp to force the browser to reload the image
+        const separator = newImage.image_url.includes('?') ? '&' : '?';
+        processedNewImage.image_url = `${newImage.image_url}${separator}t=${Date.now()}`;
+    }
+
+    const targetUrl = originalImage.image_url;
+
     // Update Characters
     setSavedCharacters(prev => prev.map(char => ({
         ...char,
         generatedPortraits: char.generatedPortraits.map(img => 
-            img.image_url === originalImage.image_url ? newImage : img
+            // Check both clean URL and potentially previously timestamped URL
+            img.image_url.split('?')[0] === targetUrl.split('?')[0] ? processedNewImage : img
         )
     })));
 
     // Update Storyboards
     setStoryboards(prev => {
         const next = { ...prev };
+        let updated = false;
+
         Object.keys(next).forEach(key => {
-            next[key] = next[key].map(item => ({
-                ...item,
-                image: item.image.image_url === originalImage.image_url ? newImage : item.image
-            }));
+            const items = next[key];
+            const newItems = items.map(item => {
+                // Robust comparison ignoring existing timestamps
+                const itemBaseUrl = item.image.image_url.split('?')[0];
+                const targetBaseUrl = targetUrl.split('?')[0];
+                
+                if (itemBaseUrl === targetBaseUrl) {
+                    updated = true;
+                    return {
+                        ...item,
+                        image: processedNewImage
+                    };
+                }
+                return item;
+            });
+            next[key] = newItems;
         });
+        
         return next;
     });
 
     // Update the currently selected image reference so the UI reflects the save immediately
-    setSelectedImageForEdit(newImage);
+    setSelectedImageForEdit(processedNewImage);
   };
 
   // --- Project Import / Export ---
@@ -231,6 +257,7 @@ const App: React.FC = () => {
           />
         ) : view === 'STORYBOARD' ? (
           <Storyboard 
+            key={selectedScene[0]?.id || 'storyboard'} // Force remount on scene change
             sceneElements={selectedScene} 
             onBack={handleBackToEditor} 
             savedCharacters={savedCharacters}
