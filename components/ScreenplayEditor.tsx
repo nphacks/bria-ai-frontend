@@ -96,7 +96,7 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full max-h-full w-full max-w-5xl mx-auto">
+    <div className="flex flex-col h-full max-h-full w-full max-w-7xl mx-auto">
       <div 
         ref={scrollRef}
         className="flex-grow overflow-y-auto p-8 sm:p-12 bg-[#1a1a1a] shadow-2xl border-x border-zinc-800 custom-scrollbar"
@@ -112,7 +112,7 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
                   {/* Picture This Button */}
                   <button
                     onClick={() => handlePictureThis(el.id)}
-                    className="absolute -right-32 top-0 opacity-0 group-hover:opacity-100 flex items-center space-x-1.5 px-2 py-1 bg-emerald-900/50 hover:bg-emerald-900 text-emerald-400 text-xs font-sans rounded border border-emerald-800 transition-all transform hover:scale-105"
+                    className="absolute -left-48 top-0.5 flex items-center gap-1.5 px-2 py-1 bg-zinc-900 hover:bg-emerald-900/30 text-zinc-500 hover:text-emerald-400 text-[10px] font-sans rounded border border-zinc-800 hover:border-emerald-800 transition-all uppercase font-medium tracking-wide backdrop-blur-sm shadow-sm"
                     title="Generate Storyboard"
                   >
                     <Camera className="w-3 h-3" />
