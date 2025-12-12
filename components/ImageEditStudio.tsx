@@ -253,6 +253,12 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
             return;
         }
         
+        // Preserve structured_prompt if missing in result
+        // This is crucial for enabling "Advanced Remix" on images modified by standard tools
+        if (currentImage.structured_prompt && !result.structured_prompt) {
+            result.structured_prompt = currentImage.structured_prompt;
+        }
+
         setCurrentImage(result);
         if (isMaskingTool) clearCanvas();
         

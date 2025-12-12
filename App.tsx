@@ -73,7 +73,7 @@ const App: React.FC = () => {
     if (originalImage.image_url === newImage.image_url) {
         // Append a timestamp to force the browser to reload the image
         const separator = newImage.image_url.includes('?') ? '&' : '?';
-        processedNewImage.image_url = `${newImage.image_url}${separator}t=${Date.now()}`;
+        processedNewImage.image_url = `${newImage.image_url.split('?')[0]}${separator}t=${Date.now()}`;
     }
 
     const targetUrl = originalImage.image_url;
