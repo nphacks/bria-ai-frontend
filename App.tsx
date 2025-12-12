@@ -68,39 +68,40 @@ const App: React.FC = () => {
   };
 
   const handleSaveEditedImage = (originalImage: GeneratedImage, newImage: GeneratedImage) => {
-    // Ensure we force a refresh if the URL is identical (cache busting)
     let processedNewImage = { ...newImage };
-    if (originalImage.image_url === newImage.image_url) {
-        // Append a timestamp to force the browser to reload the image
-        const separator = newImage.image_url.includes('?') ? '&' : '?';
-        processedNewImage.image_url = `${newImage.image_url.split('?')[0]}${separator}t=${Date.now()}`;
+    
+    // Normalize URLs for comparison to handle existing timestamps or parameters
+    const originalBase = originalImage.image_url.split('?')[0];
+    const newBase = newImage.image_url.split('?')[0];
+
+    // If the base URL is the same, we MUST append a new timestamp to force a browser refresh
+    // This handles cases where the backend overwrites the file or returns the same filename
+    if (originalBase === newBase) {
+        processedNewImage.image_url = `${newBase}?t=${Date.now()}`;
     }
 
     const targetUrl = originalImage.image_url;
+    const targetBase = originalBase;
 
     // Update Characters
     setSavedCharacters(prev => prev.map(char => ({
         ...char,
-        generatedPortraits: char.generatedPortraits.map(img => 
-            // Check both clean URL and potentially previously timestamped URL
-            img.image_url.split('?')[0] === targetUrl.split('?')[0] ? processedNewImage : img
-        )
+        generatedPortraits: char.generatedPortraits.map(img => {
+            const imgBase = img.image_url.split('?')[0];
+            return imgBase === targetBase ? processedNewImage : img;
+        })
     })));
 
     // Update Storyboards
     setStoryboards(prev => {
         const next = { ...prev };
-        let updated = false;
-
+        
         Object.keys(next).forEach(key => {
             const items = next[key];
             const newItems = items.map(item => {
-                // Robust comparison ignoring existing timestamps
-                const itemBaseUrl = item.image.image_url.split('?')[0];
-                const targetBaseUrl = targetUrl.split('?')[0];
+                const itemBase = item.image.image_url.split('?')[0];
                 
-                if (itemBaseUrl === targetBaseUrl) {
-                    updated = true;
+                if (itemBase === targetBase) {
                     return {
                         ...item,
                         image: processedNewImage

@@ -29,6 +29,44 @@ const formatKey = (key: string) => {
     return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
 
+const AutoResizeTextarea = ({ 
+    value, 
+    onChange, 
+    className, 
+    placeholder, 
+    minHeight = "60px", 
+    maxHeight = "300px" 
+}: {
+    value: string;
+    onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+    className?: string;
+    placeholder?: string;
+    minHeight?: string;
+    maxHeight?: string;
+}) => {
+    const ref = useRef<HTMLTextAreaElement>(null);
+
+    useEffect(() => {
+        if (ref.current) {
+            // Reset height to auto to correctly calculate shrink
+            ref.current.style.height = 'auto';
+            // Set height to scrollHeight
+            ref.current.style.height = `${ref.current.scrollHeight}px`;
+        }
+    }, [value]);
+
+    return (
+        <textarea
+            ref={ref}
+            value={value}
+            onChange={onChange}
+            placeholder={placeholder}
+            className={`${className} overflow-y-auto resize-none block`}
+            style={{ minHeight, maxHeight }}
+        />
+    );
+};
+
 export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ 
     image: initialImage, 
     onBack, 
@@ -346,6 +384,12 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
           // Generate new image using the reference + new prompt.
           // By passing [currentImage], we ensure the structured_prompt is sent to the backend.
           const result = await generateImage(fullPrompt, [currentImage]);
+          
+          // Preserve structured_prompt if missing in result
+          if (currentImage.structured_prompt && !result.structured_prompt) {
+              result.structured_prompt = currentImage.structured_prompt;
+          }
+
           setCurrentImage(result);
           
       } catch (error) {
@@ -418,7 +462,8 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
 
   if (!initialImage) return null;
 
-  const hasUnsavedChanges = currentImage?.image_url !== initialImage?.image_url;
+  // Check object reference to ensure save button appears even if URL string is identical
+  const hasUnsavedChanges = currentImage !== initialImage;
 
   return (
     <div className="h-full bg-zinc-950 flex flex-col animate-in fade-in duration-300">
@@ -580,10 +625,11 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
                                                         <div className="space-y-2">
                                                             {value.map((item, idx) => (
                                                                 <div key={idx} className="flex gap-2 items-start group">
-                                                                    <textarea 
+                                                                    <AutoResizeTextarea 
                                                                         value={item}
                                                                         onChange={(e) => handleArrayUpdate(key, idx, e.target.value)}
-                                                                        className="flex-1 bg-zinc-900 text-sm text-zinc-300 p-2 rounded border border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-y min-h-[60px]"
+                                                                        className="flex-1 bg-zinc-900 text-sm text-zinc-300 p-2 rounded border border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                                                                        minHeight="60px"
                                                                     />
                                                                     <button 
                                                                         onClick={() => handleDeleteArrayItem(key, idx)}
@@ -601,11 +647,12 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
                                                             </button>
                                                         </div>
                                                     ) : (
-                                                        <textarea 
+                                                        <AutoResizeTextarea 
                                                             value={value as string}
                                                             onChange={(e) => setEditedData(prev => ({...prev, [key]: e.target.value}))}
-                                                            className="w-full bg-zinc-900 text-sm text-zinc-300 p-3 rounded border border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-y min-h-[100px] leading-relaxed"
+                                                            className="w-full bg-zinc-900 text-sm text-zinc-300 p-3 rounded border border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none leading-relaxed"
                                                             placeholder={`Describe ${formatKey(key)}...`}
+                                                            minHeight="100px"
                                                         />
                                                     )}
                                                 </div>
@@ -618,11 +665,12 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
                                     <label className="text-xs font-bold text-emerald-500 uppercase mb-2 block flex items-center gap-2">
                                         <Plus className="w-3 h-3" /> Additional Instructions
                                     </label>
-                                    <textarea 
+                                    <AutoResizeTextarea 
                                         value={additionalPrompt}
                                         onChange={(e) => setAdditionalPrompt(e.target.value)}
                                         placeholder="E.g., Make it look more cinematic, change the time of day to sunset..."
-                                        className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-3 text-sm text-white focus:border-emerald-500 outline-none h-24 resize-none"
+                                        className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-3 text-sm text-white focus:border-emerald-500 outline-none"
+                                        minHeight="96px"
                                     />
                                 </div>
                              </div>
