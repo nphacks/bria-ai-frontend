@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Wand2, Eraser, Move, Undo2, Download, RefreshCw, Layers, Check, X, Sparkles, ImagePlus, Aperture, UserMinus, Maximize, FileText } from 'lucide-react';
+import { ArrowLeft, Wand2, Eraser, Move, Undo2, Download, RefreshCw, Layers, Check, X, Sparkles, ImagePlus, Aperture, UserMinus, Maximize, FileText, Palette, Sun, Box, BookOpen, PenTool, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { GeneratedImage } from '../types';
-import { eraseImage, generativeFill, removeBackground, replaceBackground, blurBackground, removeForeground, expandImage, generateFullDescriptions } from '../services/apiService';
+import { eraseImage, generativeFill, removeBackground, replaceBackground, blurBackground, removeForeground, expandImage, generateFullDescriptions, generateImage } from '../services/apiService';
 
 interface ImageEditStudioProps {
   image: GeneratedImage | null;
@@ -12,6 +12,22 @@ interface ImageEditStudioProps {
 const ASPECT_RATIOS = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9"];
 
 type EditTool = 'move' | 'eraser' | 'gen_fill' | 'remove_bg' | 'replace_bg' | 'blur_bg' | 'remove_fg' | 'expand' | 'advanced';
+
+// Helper to guess icon based on key name
+const getKeyIcon = (key: string) => {
+    const k = key.toLowerCase();
+    if (k.includes('light')) return <Sun className="w-4 h-4 text-amber-500" />;
+    if (k.includes('color') || k.includes('palette')) return <Palette className="w-4 h-4 text-purple-500" />;
+    if (k.includes('object') || k.includes('item')) return <Box className="w-4 h-4 text-blue-500" />;
+    if (k.includes('context') || k.includes('story')) return <BookOpen className="w-4 h-4 text-emerald-500" />;
+    if (k.includes('style') || k.includes('art')) return <PenTool className="w-4 h-4 text-pink-500" />;
+    if (k.includes('background') || k.includes('setting')) return <ImagePlus className="w-4 h-4 text-cyan-500" />;
+    return <FileText className="w-4 h-4 text-zinc-500" />;
+};
+
+const formatKey = (key: string) => {
+    return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
 
 export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({ 
     image: initialImage, 
@@ -36,6 +52,9 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
   
   // Advanced Edit State
   const [advancedData, setAdvancedData] = useState<any | null>(null);
+  const [editedData, setEditedData] = useState<Record<string, string>>({});
+  const [additionalPrompt, setAdditionalPrompt] = useState('');
+  const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({});
 
   // Canvas & Image Refs
   const containerRef = useRef<HTMLDivElement>(null);
@@ -58,6 +77,8 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
     clearCanvas();
     // Reset advanced data on new image
     setAdvancedData(null);
+    setEditedData({});
+    setAdditionalPrompt('');
   }, [initialImage]);
 
   // Initialize canvas size to match image natural size once image loads
@@ -81,6 +102,28 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
     window.addEventListener('resize', updateImageScale);
     return () => window.removeEventListener('resize', updateImageScale);
   }, []);
+
+  // Initialize edited data when analysis completes
+  useEffect(() => {
+    if (advancedData) {
+        const initial: Record<string, string> = {};
+        const initialExpanded: Record<string, boolean> = {};
+        
+        Object.entries(advancedData).forEach(([k, v]) => {
+            if (Array.isArray(v)) {
+                initial[k] = v.map(item => typeof item === 'string' ? item : JSON.stringify(item)).join('\n\n');
+            } else if (typeof v === 'string') {
+                initial[k] = v;
+            } else {
+                initial[k] = JSON.stringify(v, null, 2);
+            }
+            // Auto expand short fields
+            initialExpanded[k] = initial[k].length < 100;
+        });
+        setEditedData(initial);
+        setExpandedKeys(initialExpanded);
+    }
+  }, [advancedData]);
 
   const clearCanvas = () => {
     if (canvasRef.current) {
@@ -130,11 +173,6 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
     if (!isDrawing && e.type !== 'mousedown' && e.type !== 'touchstart') return;
     if (!isMaskingTool || !canvasRef.current) return;
     
-    // For touch events we need to prevent scrolling
-    if (e.type.startsWith('touch')) {
-       // e.preventDefault(); 
-    }
-
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
 
@@ -228,6 +266,34 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
     }
   };
 
+  const handleRegenerateFromAdvanced = async () => {
+      if (!currentImage) return;
+      setIsProcessing(true);
+      try {
+          // Construct full prompt from edited data
+          const promptParts = Object.entries(editedData)
+              .filter(([_, v]) => v && v.trim())
+              .map(([k, v]) => `${formatKey(k)}: ${v.trim()}`);
+          
+          if (additionalPrompt.trim()) {
+              promptParts.push(`Additional Instructions: ${additionalPrompt.trim()}`);
+          }
+
+          const fullPrompt = promptParts.join('\n\n');
+          
+          // Generate new image using the reference + new prompt
+          // We pass the current image as reference to maintain composition/identity
+          const result = await generateImage(fullPrompt, [currentImage]);
+          setCurrentImage(result);
+          
+      } catch (error) {
+          console.error("Regeneration failed", error);
+          alert("Failed to regenerate image.");
+      } finally {
+          setIsProcessing(false);
+      }
+  };
+
   const handleSave = () => {
       if (initialImage && currentImage) {
           onSave(initialImage, currentImage);
@@ -237,6 +303,10 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
   const handleDiscard = () => {
       setCurrentImage(initialImage);
       clearCanvas();
+  };
+
+  const toggleExpandKey = (key: string) => {
+      setExpandedKeys(prev => ({...prev, [key]: !prev[key]}));
   };
 
   if (!initialImage) return null;
@@ -336,66 +406,104 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
               {activeTool === 'advanced' ? (
                 /* Advanced Editing View */
                 <div className="flex flex-col h-full animate-in slide-in-from-right-8 fade-in duration-300">
-                    <div className="flex items-center gap-2 mb-6">
+                    <div className="flex items-center gap-2 mb-4 flex-none">
                         <button 
                             onClick={() => setActiveTool('move')} 
                             className="p-2 -ml-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-colors"
                         >
                             <ArrowLeft className="w-5 h-5" />
                         </button>
-                        <h3 className="text-lg font-bold text-white">Tools</h3>
+                        <h3 className="text-lg font-bold text-white">Advanced Remix</h3>
                     </div>
                     
-                    <div className="p-4 bg-zinc-950/50 rounded-xl border border-zinc-800 flex-1 flex flex-col overflow-hidden">
-                         <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2 flex-none">
-                            <FileText className="w-4 h-4 text-indigo-500" />
-                            Advanced Editing
-                         </h4>
-                         <p className="text-xs text-zinc-400 leading-relaxed mb-6 flex-none">
-                            Analyze the structure and content of the generated image to reveal detailed descriptions.
-                         </p>
-                         
-                         {!advancedData ? (
-                            <div className="flex-1 flex flex-col items-center justify-center">
-                                <button 
-                                    onClick={handleApplyTool}
-                                    disabled={isProcessing || !currentImage?.structured_prompt}
-                                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20"
-                                >
-                                    <Sparkles className="w-4 h-4" />
-                                    Analyze Structure
-                                </button>
-                                {!currentImage?.structured_prompt && (
-                                     <p className="text-xs text-red-400 mt-4 text-center">
-                                         Structured prompt data is missing for this image.
+                    {!advancedData ? (
+                        <div className="p-6 bg-zinc-950/50 rounded-xl border border-zinc-800 flex-1 flex flex-col items-center justify-center text-center">
+                            <Sparkles className="w-12 h-12 text-indigo-500 mb-4 opacity-50" />
+                            <h4 className="text-lg font-bold text-white mb-2">Analyze & Remix</h4>
+                            <p className="text-sm text-zinc-400 leading-relaxed mb-6 max-w-xs">
+                                Extract the image's structure, style, and content, then modify specific details to generate high-fidelity variations.
+                            </p>
+                            <button 
+                                onClick={handleApplyTool}
+                                disabled={isProcessing || !currentImage?.structured_prompt}
+                                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20"
+                            >
+                                <Sparkles className="w-4 h-4" />
+                                Analyze Image Structure
+                            </button>
+                             {!currentImage?.structured_prompt && (
+                                     <p className="text-xs text-red-400 mt-4">
+                                         Structured prompt data is missing.
                                      </p>
                                  )}
-                            </div>
-                         ) : (
-                             <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
-                                {Object.entries(advancedData).map(([key, value]) => (
-                                    <div key={key}>
-                                        <span className="text-xs font-bold text-zinc-500 uppercase block mb-1">
-                                            {key.replace(/_/g, ' ')}
-                                        </span>
-                                        {Array.isArray(value) ? (
-                                            <div className="space-y-2">
-                                                {value.map((item: any, idx: number) => (
-                                                    <div key={idx} className="text-sm text-zinc-300 bg-zinc-900/50 p-2 rounded border border-zinc-800">
-                                                        {typeof item === 'string' ? item : JSON.stringify(item)}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <p className="text-sm text-zinc-300 bg-zinc-900/50 p-2 rounded border border-zinc-800 whitespace-pre-wrap">
-                                                {typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
-                                            </p>
-                                        )}
-                                    </div>
-                                ))}
+                        </div>
+                    ) : (
+                        <div className="flex-1 flex flex-col overflow-hidden">
+                             <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3 pb-20">
+                                <div className="p-3 bg-indigo-900/20 border border-indigo-500/30 rounded-lg text-xs text-indigo-200 flex items-start gap-2 mb-2">
+                                    <Sparkles className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                                    <span>Review the analyzed details below. Modify specific fields to guide the remix, or add new instructions at the bottom.</span>
+                                </div>
+
+                                {Object.entries(editedData).map(([key, value]) => {
+                                    const isExpanded = expandedKeys[key];
+                                    return (
+                                        <div key={key} className="bg-zinc-950 border border-zinc-800 rounded-lg overflow-hidden transition-all hover:border-zinc-700">
+                                            <button 
+                                                onClick={() => toggleExpandKey(key)}
+                                                className="w-full flex items-center justify-between p-3 bg-zinc-900/50 hover:bg-zinc-800/50 transition-colors"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    {getKeyIcon(key)}
+                                                    <span className="text-xs font-bold text-zinc-300 uppercase tracking-wide">
+                                                        {formatKey(key)}
+                                                    </span>
+                                                </div>
+                                                <div className="text-zinc-500">
+                                                    {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                                </div>
+                                            </button>
+                                            
+                                            {isExpanded && (
+                                                <div className="p-2 bg-black">
+                                                    <textarea 
+                                                        value={value}
+                                                        onChange={(e) => setEditedData(prev => ({...prev, [key]: e.target.value}))}
+                                                        className="w-full bg-zinc-900 text-sm text-zinc-300 p-3 rounded border border-zinc-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-y min-h-[100px] leading-relaxed"
+                                                        placeholder={`Describe ${formatKey(key)}...`}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+
+                                <div className="pt-4 border-t border-zinc-800 mt-4">
+                                    <label className="text-xs font-bold text-emerald-500 uppercase mb-2 block flex items-center gap-2">
+                                        <Plus className="w-3 h-3" /> Additional Instructions
+                                    </label>
+                                    <textarea 
+                                        value={additionalPrompt}
+                                        onChange={(e) => setAdditionalPrompt(e.target.value)}
+                                        placeholder="E.g., Make it look more cinematic, change the time of day to sunset..."
+                                        className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-3 text-sm text-white focus:border-emerald-500 outline-none h-24 resize-none"
+                                    />
+                                </div>
                              </div>
-                         )}
-                    </div>
+
+                             {/* Sticky Bottom Actions */}
+                             <div className="pt-4 mt-auto border-t border-zinc-800 bg-zinc-900 z-10">
+                                 <button 
+                                     onClick={handleRegenerateFromAdvanced}
+                                     disabled={isProcessing}
+                                     className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20 transition-all hover:scale-[1.01]"
+                                 >
+                                     {isProcessing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                                     Generate Variation
+                                 </button>
+                             </div>
+                        </div>
+                    )}
                 </div>
               ) : (
                 /* Standard Tool View */
@@ -471,10 +579,10 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
                           <button 
                             onClick={() => setActiveTool('advanced')}
                             disabled={hasUnsavedChanges}
-                            className={`p-4 col-span-2 rounded-xl border flex flex-row items-center justify-center gap-3 transition-all ${activeTool === 'advanced' ? 'bg-zinc-800 border-indigo-500 text-white' : 'border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
+                            className="p-4 col-span-2 rounded-xl border flex flex-row items-center justify-center gap-3 transition-all border-zinc-800 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
                           >
                               <FileText className="w-5 h-5" />
-                              <span className="text-xs font-medium">Advanced Editing</span>
+                              <span className="text-xs font-medium">Advanced Remix</span>
                           </button>
                       </div>
                   </div>
