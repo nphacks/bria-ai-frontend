@@ -68,29 +68,34 @@ const App: React.FC = () => {
   };
 
   const handleSaveEditedImage = (originalImage: GeneratedImage, newImage: GeneratedImage) => {
-    // Clone new image to avoid reference issues
     const processedNewImage = { ...newImage };
     
-    // Normalize URLs by stripping query params (like timestamps)
-    const originalBase = originalImage.image_url.split('?')[0];
-    const newBase = newImage.image_url.split('?')[0];
+    const getBaseUrl = (url: string) => url ? url.split('?')[0] : '';
+
+    const originalBase = getBaseUrl(originalImage.image_url);
+    const newBase = getBaseUrl(newImage.image_url);
 
     // Cache Busting:
     // If the backend returned the exact same filename (e.g. overwrite), we append a timestamp.
     // If the backend returned a new filename (e.g. advanced remix), we use it as is.
-    if (originalBase === newBase) {
+    if (originalBase === newBase && newBase !== '') {
         processedNewImage.image_url = `${newBase}?t=${Date.now()}`;
     }
 
-    // We search for items matching the ORIGINAL base URL to replace them.
     const targetBase = originalBase;
+
+    // Helper to check if an image matches the target
+    const isMatch = (imgUrl: string) => {
+        const currentBase = getBaseUrl(imgUrl);
+        // Check base match OR exact match (fallback) to ensure we catch the item
+        return currentBase === targetBase || imgUrl === originalImage.image_url;
+    };
 
     // Update Characters
     setSavedCharacters(prev => prev.map(char => ({
         ...char,
         generatedPortraits: char.generatedPortraits.map(img => {
-            const imgBase = img.image_url.split('?')[0];
-            return imgBase === targetBase ? processedNewImage : img;
+            return isMatch(img.image_url) ? processedNewImage : img;
         })
     })));
 
@@ -101,9 +106,7 @@ const App: React.FC = () => {
         Object.keys(next).forEach(key => {
             const items = next[key];
             const newItems = items.map(item => {
-                const itemBase = item.image.image_url.split('?')[0];
-                
-                if (itemBase === targetBase) {
+                if (isMatch(item.image.image_url)) {
                     return {
                         ...item,
                         image: processedNewImage
@@ -118,7 +121,6 @@ const App: React.FC = () => {
     });
 
     // Update the currently selected image reference so the UI reflects the save immediately
-    // This is crucial for keeping the Studio in sync if the user stays in it
     setSelectedImageForEdit(processedNewImage);
   };
 
