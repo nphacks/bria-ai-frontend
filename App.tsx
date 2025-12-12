@@ -4,33 +4,23 @@ import { Header } from './components/Header';
 import { Storyboard } from './components/Storyboard';
 import { CharacterListModal } from './components/CharacterListModal';
 import { ImageEditStudio } from './components/ImageEditStudio';
+import { HomePage } from './components/HomePage';
 import { ScriptElement, CharacterProfile, StoryboardItem, ProjectData, GeneratedImage } from './types';
 import { normalizeGeneratedImage } from './services/apiService';
 
-type ViewState = 'EDITOR' | 'STORYBOARD' | 'EDIT_STUDIO';
+type ViewState = 'HOME' | 'EDITOR' | 'STORYBOARD' | 'EDIT_STUDIO';
 
-const DEFAULT_SCRIPT: ScriptElement[] = [
-    { id: '1', type: 'SCENE_HEADING', content: 'EXT. OCEAN - DAY', sceneNumber: 1 },
-    { id: '2', type: 'ACTION', content: 'FADE UP on a cold, foggy sky. The only sounds are the lapping of the ocean waves and the distant tolling of a ship\'s bell.' },
-    { id: '3', type: 'ACTION', content: 'Then, chugging out of the thick mist, comes a 1940s TRAWLER.' },
-    { id: '4', type: 'ACTION', content: 'A strange figure wearing a bright green waistcoat and wildly colourful scarf climbs the mast. This is Willy Wonka.' },
-    { id: '5', type: 'ACTION', content: 'As he peers into the fog, he sings A HATFUL OF DREAMS.' },
-    { id: '6', type: 'CHARACTER', content: 'WILLY' },
-    { id: '7', type: 'DIALOGUE', content: 'After seven years of life upon the ocean,' },
-    { id: '8', type: 'DIALOGUE', content: 'It is time to bid the seven seas farewell,' },
-    { id: '9', type: 'DIALOGUE', content: 'And the city I’ve pinned seven years of hopes on' },
-    { id: '10', type: 'DIALOGUE', content: 'Lies just over the horizon. I can hear the harbour bell!' },
-    { id: '11', type: 'ACTION', content: 'He spies a GRAND OLD CITY looming out of the freezing fog.' },
-    { id: '12', type: 'CHARACTER', content: 'WILLY (CONT\'D)' },
-    { id: '13', type: 'DIALOGUE', content: 'Land ahoy!!' },
-    { id: '14', type: 'ACTION', content: 'Willy grabs a rope and ABSEILS DOWN to the deck as the other sailors prepare the boat to come into harbour.' },
+// Basic template for a new project
+const EMPTY_SCRIPT: ScriptElement[] = [
+    { id: '1', type: 'SCENE_HEADING', content: 'INT. UNTITLED SCENE - DAY', sceneNumber: 1 },
+    { id: '2', type: 'ACTION', content: 'Start your story here...' },
 ];
 
 const App: React.FC = () => {
-  const [view, setView] = useState<ViewState>('EDITOR');
+  const [view, setView] = useState<ViewState>('HOME');
   
   // Unified Project State
-  const [elements, setElements] = useState<ScriptElement[]>(DEFAULT_SCRIPT);
+  const [elements, setElements] = useState<ScriptElement[]>(EMPTY_SCRIPT);
   const [savedCharacters, setSavedCharacters] = useState<CharacterProfile[]>([]);
   // storyboards is now Record<SceneID, StoryboardItem[]>
   const [storyboards, setStoryboards] = useState<Record<string, StoryboardItem[]>>({});
@@ -40,6 +30,67 @@ const App: React.FC = () => {
   
   // Edit Studio State
   const [selectedImageForEdit, setSelectedImageForEdit] = useState<GeneratedImage | null>(null);
+
+  const loadProjectData = (data: any) => {
+    // Basic validation check
+    if (data.screenplay && Array.isArray(data.screenplay)) {
+        setElements(data.screenplay);
+        
+        // Normalize characters data structure
+        const cleanCharacters = (data.characters || []).map((c: any) => ({
+            ...c,
+            generatedPortraits: Array.isArray(c.generatedPortraits) 
+                ? c.generatedPortraits.map(normalizeGeneratedImage) 
+                : []
+        }));
+        setSavedCharacters(cleanCharacters);
+
+        // Normalize storyboards data structure
+        const cleanStoryboards: Record<string, StoryboardItem[]> = {};
+        if (data.storyboards) {
+            Object.entries(data.storyboards).forEach(([k, v]: [string, any]) => {
+                if (!Array.isArray(v) && v.image_url) {
+                      const normImg = normalizeGeneratedImage(v);
+                      cleanStoryboards[k] = [{
+                          id: Date.now().toString(),
+                          image: normImg,
+                          note: '',
+                          description: 'Imported shot',
+                          scriptContext: ''
+                      }];
+                } else if (Array.isArray(v)) {
+                      cleanStoryboards[k] = v.map((item: any) => ({
+                          ...item,
+                          image: normalizeGeneratedImage(item.image),
+                          scriptContext: item.scriptContext || ''
+                      }));
+                }
+            });
+        }
+        setStoryboards(cleanStoryboards);
+        return true;
+    } else {
+        alert("Invalid project file format.");
+        return false;
+    }
+  };
+
+  const handleSelectProject = (name: string, data: any) => {
+      if (loadProjectData(data)) {
+          setView('EDITOR');
+      }
+  };
+
+  const handleCreateNewProject = () => {
+      setElements(EMPTY_SCRIPT);
+      setSavedCharacters([]);
+      setStoryboards({});
+      setView('EDITOR');
+  };
+
+  const handleGoHome = () => {
+      setView('HOME');
+  };
 
   const handleNavigateToStoryboard = (sceneElements: ScriptElement[]) => {
     setSelectedScene(sceneElements);
@@ -75,9 +126,7 @@ const App: React.FC = () => {
     const originalBase = getBaseUrl(originalImage.image_url);
     const newBase = getBaseUrl(newImage.image_url);
 
-    // Cache Busting:
-    // If the backend returned the exact same filename (e.g. overwrite), we append a timestamp.
-    // If the backend returned a new filename (e.g. advanced remix), we use it as is.
+    // Cache Busting
     if (originalBase === newBase && newBase !== '') {
         processedNewImage.image_url = `${newBase}?t=${Date.now()}`;
     }
@@ -87,7 +136,6 @@ const App: React.FC = () => {
     // Helper to check if an image matches the target
     const isMatch = (imgUrl: string) => {
         const currentBase = getBaseUrl(imgUrl);
-        // Check base match OR exact match (fallback) to ensure we catch the item
         return currentBase === targetBase || imgUrl === originalImage.image_url;
     };
 
@@ -145,47 +193,7 @@ const App: React.FC = () => {
     reader.onload = (event) => {
         try {
             const data = JSON.parse(event.target?.result as string);
-            // Basic validation check
-            if (data.screenplay && Array.isArray(data.screenplay)) {
-                setElements(data.screenplay);
-                
-                // Normalize characters data structure
-                const cleanCharacters = (data.characters || []).map((c: any) => ({
-                    ...c,
-                    generatedPortraits: Array.isArray(c.generatedPortraits) 
-                        ? c.generatedPortraits.map(normalizeGeneratedImage) 
-                        : []
-                }));
-                setSavedCharacters(cleanCharacters);
-
-                // Normalize storyboards data structure
-                const cleanStoryboards: Record<string, StoryboardItem[]> = {};
-                if (data.storyboards) {
-                    Object.entries(data.storyboards).forEach(([k, v]: [string, any]) => {
-                        // Handle legacy format where value was just GeneratedImage
-                        if (!Array.isArray(v) && v.image_url) {
-                             const normImg = normalizeGeneratedImage(v);
-                             cleanStoryboards[k] = [{
-                                 id: Date.now().toString(),
-                                 image: normImg,
-                                 note: '',
-                                 description: 'Imported shot',
-                                 scriptContext: ''
-                             }];
-                        } else if (Array.isArray(v)) {
-                             cleanStoryboards[k] = v.map((item: any) => ({
-                                 ...item,
-                                 image: normalizeGeneratedImage(item.image),
-                                 scriptContext: item.scriptContext || '' // Ensure backward compat
-                             }));
-                        }
-                    });
-                }
-                setStoryboards(cleanStoryboards);
-
-            } else {
-                alert("Invalid project file format.");
-            }
+            loadProjectData(data);
         } catch (err) {
             console.error(err);
             alert("Failed to parse project file.");
@@ -242,15 +250,23 @@ const App: React.FC = () => {
 
   const getAllProjectImages = (): GeneratedImage[] => {
       const charImages = savedCharacters.flatMap(c => c.generatedPortraits);
-      // Explicitly type 'list' as StoryboardItem[] to avoid "unknown" error
       const storyboardImages = Object.values(storyboards).flatMap((list: StoryboardItem[]) => list.map(item => item.image));
-      // Removing duplicates by URL might be nice, but simple concat is fast and sufficient
       return [...charImages, ...storyboardImages];
   };
+
+  if (view === 'HOME') {
+      return (
+          <HomePage 
+            onSelectProject={handleSelectProject}
+            onCreateNew={handleCreateNewProject}
+          />
+      );
+  }
 
   return (
     <div className="h-screen bg-zinc-950 flex flex-col overflow-hidden">
       <Header 
+        onGoHome={handleGoHome}
         onOpenCharacterList={() => setIsCharacterListOpen(true)} 
         onExportProject={handleExportProject}
         onImportProject={handleImportProject}
