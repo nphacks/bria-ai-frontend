@@ -402,7 +402,11 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
   };
 
   const acceptVariation = () => {
-      setPreRegenerationImage(null);
+      // Immediately save the variation to the global state
+      if (initialImage && currentImage) {
+          onSave(initialImage, currentImage);
+          setPreRegenerationImage(null);
+      }
   };
 
   const discardVariation = () => {
