@@ -599,11 +599,6 @@ export const Storyboard: React.FC<StoryboardProps> = ({
           </div>
         </div>
         <div className="flex items-center space-x-2">
-            <button onClick={onOpenCharacterList} className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 rounded-md text-sm transition-colors border border-zinc-700">
-                <Users className="w-4 h-4" /> <span>Character List</span>
-                {savedCharacters.length > 0 && <span className="bg-emerald-600 text-white text-[10px] px-1.5 rounded-full">{savedCharacters.length}</span>}
-            </button>
-            <div className="h-4 w-px bg-zinc-700 mx-1"></div>
             <div className="flex items-center gap-1">
                 {savedCharacters.slice(0, 3).map(char => (
                     <img key={char.id} src={char.generatedPortraits[0].image_url} className="w-8 h-8 rounded-full border border-zinc-600 object-cover" title={char.name} />

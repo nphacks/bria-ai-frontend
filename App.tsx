@@ -242,7 +242,8 @@ const App: React.FC = () => {
 
   const getAllProjectImages = (): GeneratedImage[] => {
       const charImages = savedCharacters.flatMap(c => c.generatedPortraits);
-      const storyboardImages = Object.values(storyboards).flatMap(list => list.map(item => item.image));
+      // Explicitly type 'list' as StoryboardItem[] to avoid "unknown" error
+      const storyboardImages = Object.values(storyboards).flatMap((list: StoryboardItem[]) => list.map(item => item.image));
       // Removing duplicates by URL might be nice, but simple concat is fast and sufficient
       return [...charImages, ...storyboardImages];
   };

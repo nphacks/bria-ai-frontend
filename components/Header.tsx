@@ -33,7 +33,7 @@ export const Header: React.FC<HeaderProps> = ({
             <FileText className="w-4 h-4 text-white" />
           </div>
           <h1 className="text-lg font-bold text-zinc-200 tracking-tight">
-            Screenplay Studio
+            PlotFrame
           </h1>
         </div>
         <div className="flex items-center space-x-3">
@@ -42,7 +42,7 @@ export const Header: React.FC<HeaderProps> = ({
             className="flex items-center space-x-2 text-xs font-medium px-3 py-1.5 rounded-md bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors border border-zinc-700"
           >
             <Users className="w-3 h-3" />
-            <span>Characters</span>
+            <span>Character List</span>
           </button>
           
           <div className="h-4 w-px bg-zinc-700 mx-1"></div>
@@ -53,12 +53,12 @@ export const Header: React.FC<HeaderProps> = ({
              title="Save Project (JSON)"
           >
             <Download className="w-3 h-3" />
-            <span>Save</span>
+            <span>Save Project</span>
           </button>
           
           <label className="flex items-center space-x-2 text-xs font-medium px-3 py-1.5 rounded-md bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors cursor-pointer">
             <Upload className="w-3 h-3" />
-            <span>Open</span>
+            <span>Open Project</span>
             <input 
                 type="file" 
                 ref={fileInputRef}

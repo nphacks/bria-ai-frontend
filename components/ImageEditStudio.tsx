@@ -328,7 +328,7 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
               // Normalize original value to match editedData structure for comparison
               let originalValueNormalized: string | string[];
               if (Array.isArray(originalValueRaw)) {
-                  originalValueNormalized = originalValueRaw.map(item => typeof item === 'string' ? item : JSON.stringify(item));
+                  originalValueNormalized = (originalValueRaw as any[]).map(item => typeof item === 'string' ? item : JSON.stringify(item));
               } else if (typeof originalValueRaw === 'string') {
                   originalValueNormalized = originalValueRaw;
               } else {
@@ -363,7 +363,7 @@ export const ImageEditStudio: React.FC<ImageEditStudioProps> = ({
                   // Compare strings
                   if (currentValue !== originalValueNormalized) {
                       hasChanged = true;
-                      changedParts.push(`${formatKey(key)}: ${currentValue.trim()}`);
+                      changedParts.push(`${formatKey(key)}: ${(currentValue as string).trim()}`);
                   }
               }
           });
